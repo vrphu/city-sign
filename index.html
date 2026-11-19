@@ -1,0 +1,880 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>城签 · City Sign</title>
+<style>
+:root{
+  --ink:#23282d; --muted:#6d747b; --faint:#9aa1a7; --line:#e6e2da;
+  --paper:#fbf9f4; --card:#ffffff; --accent:#a9553d; --accent-soft:#f4e9e3;
+  --sage:#5d7568; --gold:#b8975a; --shadow:0 18px 48px rgba(43,38,32,.10);
+  --sans:"PingFang SC","Microsoft YaHei","Noto Sans SC",system-ui,sans-serif;
+  --serif:"Songti SC","STSong","Noto Serif SC",Georgia,serif;
+}
+*{box-sizing:border-box}
+body{margin:0;background:#efece5;color:var(--ink);font-family:var(--sans);
+  -webkit-font-smoothing:antialiased;line-height:1.6}
+
+/* ---------- 控制条 ---------- */
+.toolbar{position:sticky;top:0;z-index:20;background:rgba(251,249,244,.94);
+  backdrop-filter:blur(12px);border-bottom:1px solid var(--line);padding:12px 22px;
+  display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.brand{font-family:var(--serif);font-size:19px;font-weight:700;letter-spacing:2px;white-space:nowrap}
+.brand span{color:var(--accent)}
+.search-wrap{position:relative;flex:1;min-width:200px;max-width:360px}
+.search-wrap input{width:100%;padding:9px 34px 9px 13px;border:1px solid var(--line);
+  border-radius:9px;background:#fff;font-size:13px;outline:none;font-family:inherit}
+.search-wrap input:focus{border-color:var(--sage);box-shadow:0 0 0 3px rgba(93,117,104,.10)}
+.search-wrap .clear{position:absolute;right:9px;top:7px;border:0;background:none;
+  color:var(--faint);cursor:pointer;font-size:16px;line-height:1}
+.picker{position:absolute;top:calc(100% + 5px);left:0;right:0;z-index:30;background:#fff;
+  border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);
+  max-height:340px;overflow:auto;padding:5px}
+.picker[hidden]{display:none}
+.picker .grp{font-size:10.5px;color:var(--faint);letter-spacing:2px;padding:7px 9px 3px}
+.picker button{display:flex;justify-content:space-between;align-items:center;width:100%;
+  border:0;background:none;padding:7px 9px;border-radius:6px;cursor:pointer;text-align:left;
+  font-family:inherit;font-size:13px;color:var(--ink)}
+.picker button:hover,.picker button.on{background:var(--accent-soft);color:var(--accent)}
+.picker button small{color:var(--faint);font-size:11px}
+.tool-btn{border:1px solid var(--line);background:#fff;border-radius:8px;padding:8px 12px;
+  cursor:pointer;font-size:12.5px;font-family:inherit;color:var(--ink);white-space:nowrap}
+.tool-btn:hover{border-color:var(--sage);color:var(--sage)}
+.tool-btn.primary{background:var(--ink);color:#fff;border-color:var(--ink)}
+.tool-btn.primary:hover{background:var(--sage);border-color:var(--sage)}
+.tool-btn.icon{font-size:15px;padding:7px 10px}
+.lang-toggle{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.lang-toggle button{border:0;background:#fff;padding:8px 12px;cursor:pointer;
+  font-size:12px;font-family:inherit;color:var(--muted)}
+.lang-toggle button.on{background:var(--ink);color:#fff}
+.tool-sep{width:1px;height:26px;background:var(--line);margin:0 2px}
+.export-menu{position:relative}
+.export-pop{position:absolute;top:calc(100% + 5px);right:0;z-index:30;background:#fff;
+  border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);padding:5px;min-width:180px}
+.export-pop[hidden]{display:none}
+.export-pop button{display:block;width:100%;border:0;background:none;padding:9px 12px;
+  border-radius:6px;cursor:pointer;text-align:left;font-family:inherit;font-size:12.5px;color:var(--ink)}
+.export-pop button:hover{background:var(--accent-soft);color:var(--accent)}
+
+/* ---------- 城签卡片 ---------- */
+.stage{padding:26px 18px 60px;display:flex;justify-content:center}
+.sign{width:760px;max-width:100%;background:var(--card);border-radius:18px;overflow:hidden;
+  box-shadow:var(--shadow);position:relative}
+.hero{position:relative;height:338px;background:#d8d5cd;overflow:hidden}
+.hero img{width:100%;height:100%;object-fit:cover;display:block;transition:opacity .5s,filter .7s}
+.hero .fallback{position:absolute;inset:0;display:none}
+.hero::after{content:"";position:absolute;inset:0;z-index:1;
+  background:linear-gradient(180deg,rgba(20,24,27,.34) 0%,rgba(20,24,27,.02) 38%,
+  rgba(20,24,27,.10) 66%,rgba(20,24,27,.58) 100%)}
+/* 皮肤：仅用滤镜与色调，界面不显示样式名 */
+.hero.skin-warm img{filter:saturate(1.12) sepia(.10) contrast(1.03)}
+.hero.skin-cool img{filter:saturate(.9) hue-rotate(-12deg) brightness(1.02)}
+.hero.skin-dusk img{filter:saturate(1.05) sepia(.22) brightness(.9) contrast(1.08)}
+.hero.skin-night img{filter:saturate(.8) brightness(.6) contrast(1.15) hue-rotate(8deg)}
+.hero.skin-film img{filter:grayscale(.35) sepia(.18) contrast(1.05)}
+.hero.skin-vivid img{filter:saturate(1.35) contrast(1.06) brightness(1.02)}
+.hero.skin-dawn img{filter:saturate(.95) brightness(1.12) hue-rotate(6deg)}
+.hero-top{position:absolute;top:18px;left:22px;right:22px;z-index:2;display:flex;
+  justify-content:space-between;align-items:flex-start;color:#fff}
+.coord-chip{font-size:11.5px;letter-spacing:1px;background:rgba(20,24,27,.42);
+  border:1px solid rgba(255,255,255,.36);padding:6px 11px;border-radius:20px;
+  backdrop-filter:blur(6px);font-variant-numeric:tabular-nums;cursor:pointer;user-select:none}
+.coord-chip:hover{background:rgba(20,24,27,.62)}
+.issue{font-family:var(--serif);font-size:11px;letter-spacing:2px;text-align:right;
+  text-shadow:0 1px 4px rgba(0,0,0,.4)}
+.hero-bottom{position:absolute;left:30px;right:30px;bottom:22px;z-index:2;color:#fff}
+.kicker{font-size:11px;letter-spacing:3px;opacity:.9;margin:0 0 5px}
+.city-name{font-family:var(--serif);font-size:46px;line-height:1.1;margin:0;font-weight:700;
+  letter-spacing:3px;text-shadow:0 2px 14px rgba(0,0,0,.30)}
+.city-name .en{font-family:Georgia,serif;font-size:20px;font-weight:400;letter-spacing:1px;
+  margin-left:13px;opacity:.94}
+.city-sub{margin:7px 0 0;font-size:12.5px;opacity:.94;letter-spacing:.5px}
+.skin-btn{position:absolute;right:22px;bottom:20px;z-index:3;width:34px;height:34px;
+  border-radius:50%;border:1px solid rgba(255,255,255,.5);background:rgba(20,24,27,.35);
+  color:#fff;font-size:15px;cursor:pointer;backdrop-filter:blur(6px);display:flex;
+  align-items:center;justify-content:center;transition:transform .3s,background .2s}
+.skin-btn:hover{background:rgba(20,24,27,.6);transform:rotate(40deg)}
+
+/* ---------- 信息区 ---------- */
+.content{padding:26px 32px 30px}
+.now-strip{display:flex;align-items:stretch;gap:0;border:1px solid var(--line);
+  border-radius:12px;overflow:hidden;background:var(--paper)}
+.now-cell{flex:1;padding:13px 17px;min-width:0}
+.now-cell + .now-cell{border-left:1px solid var(--line)}
+.now-label{font-size:10px;color:var(--faint);letter-spacing:2px;margin:0 0 4px}
+.now-value{font-size:22px;font-weight:600;margin:0;font-variant-numeric:tabular-nums;line-height:1.25}
+.now-value small{font-size:12px;font-weight:400;color:var(--muted);margin-left:3px}
+.now-note{font-size:11px;color:var(--muted);margin:3px 0 0}
+.wx-icon{font-size:24px;margin-right:6px;vertical-align:-2px}
+
+.sec{margin-top:23px}
+.sec-title{display:flex;align-items:center;gap:8px;font-size:11px;letter-spacing:2.5px;
+  color:var(--accent);margin:0 0 11px;font-weight:600}
+.sec-title::after{content:"";height:1px;background:var(--line);flex:1}
+.facts{display:grid;grid-template-columns:repeat(3,1fr);gap:14px 18px}
+.fact-l{font-size:10.5px;color:var(--faint);letter-spacing:1px;margin:0 0 2px}
+.fact-v{font-size:14px;font-weight:500;margin:0;word-break:break-word}
+.tags{display:flex;flex-wrap:wrap;gap:7px}
+.tag{font-size:12px;padding:6px 11px;border-radius:20px;background:var(--paper);
+  border:1px solid var(--line);color:var(--ink)}
+.tag.food{background:#f6f1e9;border-color:#eadfcf;color:#8a6a3f}
+
+/* 世界位置小地图 */
+.loc-map{display:flex;gap:14px;align-items:stretch;margin-top:2px;
+  border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--paper)}
+.loc-map .map-box{flex:none;width:236px;padding:8px}
+.loc-map .map-box svg{display:block;width:100%;height:auto;border-radius:6px}
+.loc-map .map-info{flex:1;padding:13px 14px 12px 4px;min-width:0;display:flex;flex-direction:column;justify-content:center}
+.loc-l{font-size:10px;color:var(--faint);letter-spacing:2px;margin:0 0 3px}
+.loc-v{font-size:15px;font-weight:600;margin:0 0 9px;line-height:1.4;font-variant-numeric:tabular-nums}
+.loc-tz{display:inline-block;font-size:11px;background:#eef2ee;color:var(--sage);
+  border:1px solid #d9e3da;border-radius:6px;padding:3px 8px;margin-top:1px}
+.loc-note{font-size:10px;color:var(--faint);margin:9px 0 0;line-height:1.5}
+.map-tz-label{font-family:var(--sans);font-weight:600}
+
+.quote{margin:24px 0 0;padding:17px 20px 15px;background:linear-gradient(135deg,#faf6f0,#f6f1e9);
+  border-left:3px solid var(--accent);border-radius:0 10px 10px 0;position:relative}
+.quote p{margin:0;font-family:var(--serif);font-size:17px;line-height:1.8;color:#3b342c;
+  padding-right:66px}
+.quote .author{margin-top:8px;font-size:11.5px;color:var(--muted);letter-spacing:.5px}
+.quote .en-line{margin-top:9px;padding-top:9px;border-top:1px dashed #e3d9cc;
+  font-family:Georgia,serif;font-size:12.5px;color:var(--muted);font-style:italic;line-height:1.6}
+.quote .kind{display:inline-block;font-size:10px;color:var(--accent);background:var(--accent-soft);
+  border-radius:4px;padding:2px 7px;margin-right:8px;vertical-align:1px}
+.quote-nav{position:absolute;top:14px;right:14px;display:flex;align-items:center;gap:6px}
+.quote-nav button{width:26px;height:26px;border-radius:50%;border:1px solid var(--line);
+  background:#fff;cursor:pointer;color:var(--muted);font-size:13px;line-height:1;
+  display:flex;align-items:center;justify-content:center}
+.quote-nav button:hover{border-color:var(--accent);color:var(--accent)}
+.quote-nav .qcount{font-size:10.5px;color:var(--faint);font-variant-numeric:tabular-nums}
+.foot{display:flex;justify-content:space-between;gap:14px;align-items:flex-end;
+  margin-top:24px;padding-top:13px;border-top:1px solid var(--line);
+  font-size:10.5px;color:var(--faint);line-height:1.55}
+.foot .src{max-width:62%}
+.hint{text-align:center;color:var(--muted);font-size:11.5px;margin:18px 0 0}
+.toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%) translateY(20px);
+  background:var(--ink);color:#fff;padding:10px 18px;border-radius:8px;font-size:12.5px;
+  opacity:0;pointer-events:none;transition:.3s;z-index:99}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+@media (max-width:700px){
+  .toolbar{padding:10px 13px}.brand{font-size:16px}
+  .stage{padding:14px 10px 40px}
+  .hero{height:268px}.city-name{font-size:34px}.city-name .en{font-size:15px;display:block;margin:4px 0 0}
+  .content{padding:20px 18px 24px}
+  .facts{grid-template-columns:repeat(2,1fr)}
+  .now-value{font-size:18px}
+  .loc-map{flex-direction:column}.loc-map .map-box{width:100%}.loc-map .map-info{padding:4px 14px 12px}
+}
+@media print{
+  @page{size:A4 portrait;margin:10mm}
+  body{background:#fff}
+  .toolbar,.hint,.skin-btn,.quote-nav,.toast{display:none!important}
+  .stage{padding:0}
+  .sign{width:100%;box-shadow:none;border-radius:0}
+  .hero{height:88mm}
+  .content{padding:7mm 8mm}
+  .now-strip,.quote,.tag,.fact-v,.loc-map,.map-tz-label{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .hero,.hero::after,.hero img{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
+</style>
+</head>
+<body>
+
+<div class="toolbar">
+  <div class="brand">城<span>签</span> <small style="font-size:11px;color:#9aa1a7;letter-spacing:1px">CITY SIGN</small></div>
+  <div class="search-wrap">
+    <input id="search" type="text" autocomplete="off" placeholder="搜索城市 / Search city…" aria-label="搜索城市">
+    <button class="clear" id="clear" title="清除">×</button>
+    <div class="picker" id="picker" hidden></div>
+  </div>
+  <button class="tool-btn" id="randomBtn" data-zh="随机一城" data-en="Surprise me">随机一城</button>
+  <div class="lang-toggle">
+    <button id="langZh" class="on">中文</button><button id="langEn">EN</button>
+  </div>
+  <div class="tool-sep"></div>
+  <div class="export-menu">
+    <button class="tool-btn primary" id="exportBtn" data-zh="导出 ▾" data-en="Export ▾">导出 ▾</button>
+    <div class="export-pop" id="exportPop" hidden>
+      <button id="expHtml" data-zh="导出单文件 HTML（自包含）" data-en="Export standalone HTML">导出单文件 HTML（自包含）</button>
+      <button id="expPng" data-zh="导出 PNG 图片" data-en="Export PNG image">导出 PNG 图片</button>
+      <button id="expPdf" data-zh="打印 / 存为 PDF" data-en="Print / Save PDF">打印 / 存为 PDF</button>
+    </div>
+  </div>
+</div>
+
+<div class="stage">
+<article class="sign" id="sign">
+  <div class="hero" id="hero">
+    <img id="heroImg" alt="城市实景">
+    <div class="fallback" id="fallback"></div>
+    <div class="hero-top">
+      <div class="coord-chip" id="coord">—</div>
+      <div class="issue" id="issue">CITY SIGN · —</div>
+    </div>
+    <div class="hero-bottom">
+      <p class="kicker" id="kicker">CITY SIGN</p>
+      <h1 class="city-name"><span id="cityName">北京</span><span class="en" id="cityEn">Beijing</span></h1>
+      <p class="city-sub" id="citySub">—</p>
+    </div>
+    <button class="skin-btn" id="skinBtn" title="切换背景皮肤">◐</button>
+  </div>
+
+  <div class="content">
+    <div class="now-strip">
+      <div class="now-cell">
+        <p class="now-label" data-zh="此刻天气 · WEATHER NOW" data-en="WEATHER NOW">此刻天气 · WEATHER NOW</p>
+        <p class="now-value"><span class="wx-icon" id="wxIcon">◌</span><span id="wxTemp">—</span></p>
+        <p class="now-note" id="wxNote">—</p>
+      </div>
+      <div class="now-cell">
+        <p class="now-label" data-zh="当地时间 · LOCAL TIME" data-en="LOCAL TIME">当地时间 · LOCAL TIME</p>
+        <p class="now-value" id="localTime">—</p>
+        <p class="now-note" id="localDate">—</p>
+      </div>
+      <div class="now-cell">
+        <p class="now-label" data-zh="今日日照 · SUN" data-en="SUN TODAY">今日日照 · SUN</p>
+        <p class="now-value" id="sunTime">—</p>
+        <p class="now-note" id="sunNote">—</p>
+      </div>
+    </div>
+
+    <section class="sec">
+      <p class="sec-title" data-zh="世界位置 · WHERE ON EARTH" data-en="WHERE ON EARTH">世界位置 · WHERE ON EARTH</p>
+      <div class="loc-map">
+        <div class="map-box" id="mapBox"></div>
+        <div class="map-info">
+          <p class="loc-l" data-zh="经纬度 · COORDINATES" data-en="COORDINATES">经纬度 · COORDINATES</p>
+          <p class="loc-v" id="mapCoord">—</p>
+          <p class="loc-l" data-zh="时区 · TIME ZONE" data-en="TIME ZONE">时区 · TIME ZONE</p>
+          <span class="loc-tz" id="mapTz">—</span>
+          <p class="loc-note" id="mapNote">—</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="sec">
+      <p class="sec-title" data-zh="城市档案 · CITY FACTS" data-en="CITY FACTS">城市档案 · CITY FACTS</p>
+      <div class="facts" id="facts"></div>
+    </section>
+
+    <section class="sec">
+      <p class="sec-title" data-zh="地标与风味 · SIGHTS &amp; FLAVOURS" data-en="SIGHTS &amp; FLAVOURS">地标与风味 · SIGHTS &amp; FLAVOURS</p>
+      <div class="tags" id="sights"></div>
+      <div class="tags" id="foods" style="margin-top:9px"></div>
+    </section>
+
+    <blockquote class="quote" id="quoteBox">
+      <div class="quote-nav">
+        <button id="quotePrev" title="上一条">‹</button>
+        <span class="qcount" id="quoteCount">1/1</span>
+        <button id="quoteNext" title="下一条">›</button>
+      </div>
+      <p><span class="kind" id="quoteKind">名言</span><span id="quoteText">—</span></p>
+      <div class="author" id="quoteAuthor">—</div>
+      <div class="en-line" id="quoteEn" hidden></div>
+    </blockquote>
+  </div>
+</article>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+window.CITY_DATA = {"count":105,"continents":["亚洲","北美洲","南美洲","大洋洲","欧洲","非洲"],"cities":[{"id":"beijing","zh":"北京","en":"Beijing","countryZh":"中国","countryEn":"China","continent":"亚洲","region":"东亚","lat":39.9042,"lon":116.4074,"climate":"温带季风气候","popWan":2180,"areaKm2":16410,"nickname":"千年古都","landmarks":["故宫","长城","颐和园"],"tags":["首都","历史","胡同","皇城"],"note":"","tz":"Asia/Shanghai","quote":{"text":"不到长城非好汉。","author":"毛泽东《清平乐·六盘山》"},"foods":{"zh":["北京烤鸭","炸酱面","铜锅涮肉"],"en":["Peking Duck","Zhajiang Noodles","Copper Hot Pot"]},"landmarksEn":["Forbidden City","Great Wall","Summer Palace"],"tagline":{"zh":"一条中轴线，把六百年压成一张城市底片。","en":"An axis of six centuries, developed into one cityscape."},"quoteEn":{"text":"He who has never been to the Great Wall is not a true man.","author":"Mao Zedong, Qingping Yue: Liupanshan"},"continentEn":"Asia","regionEn":"East Asia","climateEn":"Temperate monsoon climate","lines":[{"zh":"不到长城非好汉。","en":"He who has never been to the Great Wall is not a true man.","byZh":"毛泽东《清平乐·六盘山》","byEn":"Mao Zedong","kindZh":"名言","kindEn":"Quote"},{"zh":"北京的胡同，是这座城市的年轮。","en":"Beijing's hutongs are the growth rings of the city.","byZh":"城市印象","byEn":"City impression","kindZh":"城市逸闻","kindEn":"Local lore"},{"zh":"一座北京城，半部中国史。","en":"One Beijing city, half of China's history.","byZh":"城市印象","byEn":"City impression","kindZh":"城市逸闻","kindEn":"Local lore"},{"zh":"一条中轴线，把六百年压成一张城市底片。","en":"An axis of six centuries, developed into one cityscape.","byZh":"城签短句","byEn":"City Sign line","kindZh":"短句","kindEn":"Original line"}]},{"id":"shanghai","zh":"上海","en":"Shanghai","countryZh":"中国","countryEn":"China","continent":"亚洲","region":"东亚","lat":31.2304,"lon":121.4737,"climate":"亚热带季风气候","popWan":2487,"areaKm2":6340,"nickname":"魔都","landmarks":["外滩","陆家嘴","豫园"],"tags":["金融","摩登","海派"],"note":"","tz":"Asia/Shanghai","quote":null,"foods":{"zh":["小笼包","生煎","红烧肉"],"en":["Xiaolongbao","Pan-fried Buns","Braised Pork"]},"landmarksEn":["The Bund","Lujiazui","Yu Garden"],"tagline":{"zh":"外滩的风，一边是百年前，一边是明天。","en":"The Bund's wind carries a century past and a future ahead."},"quoteEn":null,"continentEn":"Asia","regionEn":"East Asia","climateEn":"Subtropical monsoon climate","lines":[{"zh":"宁要浦西一张床，不要浦东一间房。","en":"Better a bed in Puxi than a room in Pudong — a saying from the 1990s.","byZh":"上海20世纪俗语","byEn":"Shanghai saying of the 1990s","kindZh":"俗语","kindEn":"Saying"},{"zh":"冒险家的乐园。","en":"A paradise for adventurers.","byZh":"近代上海别称","byEn":"Old nickname for Shanghai","kindZh":"城市逸闻","kindEn":"Local lore"},{"zh":"十里洋场。","en":"The ten-mile foreign quarter — old Shanghai's glittering entertainment district.","byZh":"近代上海别称","byEn":"Old nickname for Shanghai","kindZh":"城市逸闻","kindEn":"Local lore"},{"zh":"外滩的风，一边是百年前，一边是明天。","en":"The Bund's wind carries a century past and a future ahead.","byZh":"城签短句","byEn":"City Sign line","kindZh":"短句","kindEn":"Original line"}]},{"id":"guangzhou","zh":"广州","en":"Guangzhou","countryZh":"中国","countryEn":"China","continent":"亚洲","region":"东亚","lat":23.1291,"lon":113.2644,"climate":"亚热带季风气候","popWan":1882,"areaKm2":7434,"nickname":"花城·羊城","landmarks":["广州塔","陈家祠","沙面岛"],"tags":["美食","商贸","早茶"],"note":"","tz":"Asia/Shanghai","quote":null,"foods":{"zh":["早茶点心","煲汤","烧鹅"],"en":["Dim Sum","Double-boiled Soup","Roast Goose"]},"landmarksEn":["Canton Tower","Chen Clan Ancestral Hall","Shamian Island"],"tagline":null,"quoteEn":null,"continentEn":"Asia","regionEn":"East Asia","climateEn":"Subtropical monsoon climate","lines":[{"zh":"食在广州。","en":"The best food is in Guangzhou.","byZh":"民间俗语","byEn":"Chinese proverb","kindZh":"谚语","kindEn":"Proverb"},{"zh":"广州的天气，一日有四季。","en":"In Guangzhou, one day holds four seasons.","byZh":"民间俗语","byEn":"Local saying","kindZh":"俗语","kindEn":"Saying"}]},{"id":"shenzhen","zh":"深圳","en":"Shenzhen","countryZh":"中国","countryEn":"China","continent":"亚洲","region":"东亚","lat":22.5431,"lon":114.0579,"climate":"亚热带季风气候","popWan":1779,"areaKm2":1997,"nickname":"鹏城","landmarks":["深圳湾","华强北","大鹏所城"],"tags":["科技","创业","海滨"],"note":"","tz":"Asia/Shanghai","quote":null,"foods":{"zh":["粤菜","海鲜","客家菜"],"en":["Cantonese Cuisine","Seafood","Hakka Cuisine"]},"landmarksEn":["Shenzhen Bay","Huaqiangbei","Dapeng Fortress"],"tagline":null,"quoteEn":null,"continentEn":"Asia","regionEn":"East Asia","climateEn":"Subtropical monsoon climate","lines":[{"zh":"深圳速度。","en":"Shenzhen speed — a byword for rapid growth.","byZh":"城市说法","byEn":"City saying","kindZh":"城市逸闻","kindEn":"Local lore"},{"zh":"来了就是深圳人。","en":"Once you arrive, you are a Shenzhener.","byZh":"城市口号","byEn":"City motto","kindZh":"俗语","kindEn":"Saying"}]},{"id":"chengdu","zh":"成都","en":"Chengdu","countryZh":"中国","countryEn":"China","continent":"亚洲","region":"东亚","lat":30.5728,"lon":104.0668,"climate":"亚热带季风气候","popWan":2140,"areaKm2":14335,"nickname":"天府之国","landmarks":["宽窄巷子","大熊猫基地","武侯祠"],"tags":["悠闲","美食","熊猫"],"note":"","tz":"Asia/Shanghai","quote":{"text":"晓看红湿处，花重锦官城。","author":"杜甫《春夜喜雨》"},"foods":{"zh":["火锅","麻婆豆腐","担担面"],"en":["Hot Pot","Mapo Tofu","Dandan Noodles"]},"landmarksEn":["Kuanzhai Alley","Giant Panda Base","Wuhou Shrine"],"tagline":{"zh":"慢不是效率的反面，是把日子过出纹理。","en":"Slowness is not the opposite of efficiency; it is texture."},"quoteEn":{"text":"At dawn, look where rain has soaked — flower-heavy lies the Brocade City.","author":"Du Fu, Spring Night Rain"},"continentEn":"Asia","regionEn":"East Asia","climateEn":"Subtropical monsoon climate","lines":[{"zh":"晓看红湿处，花重锦官城。","en":"At dawn, the rain-soaked red blooms weigh heavy in the Brocade City.","byZh":"杜甫《春夜喜雨》","byEn":"Du Fu","kindZh":"文学","kindEn":"Literature"},{"zh":"天府之国。","en":"The Land of Abundance.","byZh":"《战国策》记载的称谓","byEn":"Historical epithet","kindZh":"城市逸闻","kindEn":"Local lore"},{"zh":"成都，一座来了就不想离开的城市。","en":"Chengdu — a city you never want to leave once you arrive.","byZh":"城市宣传语","byEn":"City tagline","kindZh":"俗语","kindEn":"Saying"},{"zh":"慢不是效率的反面，是把日子过出纹理。","en":"Slowness is not the opposite of efficiency; it is texture.","byZh":"城签短句","byEn":"City Sign line","kindZh":"短句","kindEn":"Original line"}]},{"id":"chongqing","zh":"重庆","en":"Chongqing","countryZh":"中国","countryEn":"China","continent":"亚洲","region":"东亚","lat":29.563,"lon":106.5516,"climate":"亚热带季风气候","popWan":3213,"areaKm2":82400,"nickname":"山城·雾都","landmarks":["洪崖洞","长江索道","磁器口"],"tags":["立体","火锅","江景"],"note":"市域面积含较大山区","tz":"Asia/Shanghai","quote":{"text":"夜发清溪向三峡，思君不见下渝州。","author":"李白《峨眉山月歌》"},"foods":{"zh":["重庆火锅","小面","辣子鸡"],"en":["Chongqing Hot Pot","Chongqing Noodles","Spicy Chicken"]},"landmarksEn":["Hongyadong","Yangtze River Cableway","Cizikou"],"tagline":null,"quoteEn":{"text":"By night I left Qingxi for the Three Gorges, thinking of you in Yuzhou — yet never arrived.","author":"Li Bai, Song of Emei Mountain Moon"},"continentEn":"Asia","regionEn":"East Asia","climateEn":"Subtropical monsoon climate","lines":[{"zh":"夜发清溪向三峡，思君不见下渝州。","en":"I left Qingxi at night for the Three Gorges, missing you down in Yuzhou.","byZh":"李白《峨眉山月歌》","byEn":"Li Bai","kindZh":"文学","kindEn":"Literature"},{"zh":"山城自古出好汉。","en":"The mountain city breeds heroes.","byZh":"民间俗语","byEn":"Local saying","kindZh":"俗语","kindEn":"Saying"}]},{"id":"hangzhou","zh":"杭州","en":"Hangzhou","countryZh":"中国","countryEn":"China","continent":"亚洲","region":"东亚","lat":30.2741,"lon":120.1551,"climate":"亚热带季风气候","popWan":1252,"areaKm2":16850,"nickname":"人间天堂","landmarks":["西湖","灵隐寺","京杭大运河"],"tags":["江南","诗意","电商"],"note":"","tz":"Asia/Shanghai","quote":{"text":"欲把西湖比西子，淡妆浓抹总相宜。","author":"苏轼《饮湖上初晴后雨》"},"foods":{"zh":["西湖醋鱼","龙井虾仁","片儿川"],"en":["West Lake Vinegar Fish","Longjing Shrimp","Pian'er Noodles"]},"landmarksEn":["West Lake","Lingyin Temple","Grand Canal"],"tagline":null,"quoteEn":{"text":"I would compare West Lake to Xizi: light makeup or heavy, both are becoming.","author":"Su Shi, Drinking at Lake"},"continentEn":"Asia","regionEn":"East Asia","climateEn":"Subtropical monsoon climate","lines":[{"zh":"欲把西湖比西子，淡妆浓抹总相宜。","en":"I would compare West Lake to Xizi: light makeup or heavy, both are becoming.","byZh":"苏轼《饮湖上初晴后雨》","byEn":"Su Shi","kindZh":"文学","kindEn":"Literature"},{"zh":"上有天堂，下有苏杭。","en":"There is paradise above, and Suzhou and Hangzhou below.","byZh":"民间谚语","byEn":"Chinese proverb","kindZh":"谚语","kindEn":"Proverb"},{"zh":"江南忆，最忆是杭州。","en":"Of my memories of the south, the deepest is Hangzhou.","byZh":"白居易《忆江南》","byEn":"Bai Juyi","kindZh":"文学","kindEn":"Literature"}]},{"id":"xian","zh":"西安","en":"Xi'an","countryZh":"中国","countryEn":"China","continent":"亚洲","region":"东亚","lat":34.3416,"lon":108.9398,"climate":"温带季风气候","popWan":1300,"areaKm2":10752,"nickname":"十三朝古都","landmarks":["兵马俑","大雁塔","古城墙"],"tags":["历史","盛唐","丝路起点"],"note":"","tz":"Asia/Shanghai","quote":{"text":"长安一片月，万户捣衣声。","author":"李白《子夜吴歌》"},"foods":{"zh":["肉夹馍","羊肉泡馍","凉皮"],"en":["Roujiamo","Lamb Paomo","Liangpi"]},"landmarksEn":["Terracotta Army","Giant Wild Goose Pagoda","City Wall"],"tagline":null,"quoteEn":{"text":"A moon over Chang'an — ten thousand households pounding clothes in the night.","author":"Li Bai, Song of the Night"},"continentEn":"Asia","regionEn":"East Asia","climateEn":"Temperate monsoon climate","lines":[{"zh":"长安一片月，万户捣衣声。","en":"A moon over Chang'an — a thousand households pounding laundry.","byZh":"李白《子夜吴歌》","byEn":"Li Bai","kindZh":"文学","kindEn":"Literature"},{"zh":"春风得意马蹄疾，一日看尽长安花。","en":"Riding high on spring winds, I saw all the flowers of Chang'an in one day.","byZh":"孟郊《登科后》","byEn":"Meng Jiao","kindZh":"文学","kindEn":"Literature"}]},{"id":"nanjing","zh":"南京","en":"Nanjing","countryZh":"中国","countryEn":"China","continent":"亚洲","region":"东亚","lat":32.0603,"lon":118.7969,"climate":"亚热带季风气候","popWan":954,"areaKm2":6587,"nickname":"六朝古都","landmarks":["中山陵","夫子庙","玄武湖"],"tags":["民国","梧桐","长江"],"note":"","tz":"Asia/Shanghai","quote":{"text":"江南佳丽地，金陵帝王洲。","author":"谢朓《入朝曲》"},"foods":{"zh":["盐水鸭","鸭血粉丝汤","小笼包"],"en":["Salted Duck","Duck Blood Vermicelli Soup","Xiaolongbao"]},"landmarksEn":["Sun Yat-sen Mausoleum","Confucius Temple","Xuanwu Lake"],"tagline":null,"quoteEn":{"text":"Jiangnan, a land of beauty; Jinling, a capital of emperors.","author":"Xie Tiao, Entering the Capital"},"continentEn":"Asia","regionEn":"East Asia","climateEn":"Subtropical monsoon climate","lines":[{"zh":"江南佳丽地，金陵帝王洲。","en":"Jiangnan, a land of beauty; Jinling, a realm of emperors.","byZh":"谢朓《入朝曲》","byEn":"Xie Tiao","kindZh":"文学","kindEn":"Literature"},{"zh":"旧时王谢堂前燕，飞入寻常百姓家。","en":"Swallows that nested in the halls of Wang and Xie now fly among common folk.","byZh":"刘禹锡《乌衣巷》","byEn":"Liu Yuxi","kindZh":"文学","kindEn":"Literature"}]},{"id":"suzhou","zh":"苏州","en":"Suzhou","countryZh":"中国","countryEn":"China","continent":"亚洲","region":"东亚","lat":31.2989,"lon":120.5853,"climate":"亚热带季风气候","popWan":1296,"areaKm2":8657,"nickname":"东方威尼斯","landmarks":["拙政园","平江路","虎丘"],"tags":["园林","水乡","评弹"],"note":"","tz":"Asia/Shanghai","quote":{"text":"君到姑苏见，人家尽枕河。","author":"杜荀鹤《送人游吴》"},"foods":{"zh":["松鼠桂鱼","苏式汤面","桂花糕"],"en":["Sweet and Sour Mandarin Fish","Suzhou Noodles","Osmanthus Cake"]},"landmarksEn":["Humble Administrator's Garden","Pingjiang Road","Tiger Hill"],"tagline":null,"quoteEn":{"text":"When you arrive at Gusu, you'll find households sleeping beside the streams.","author":"Du Xunhe, Farewell to Wu"},"continentEn":"Asia","regionEn":"East Asia","climateEn":"Subtropical monsoon climate","lines":[{"zh":"君到姑苏见，人家尽枕河。","en":"When you reach Gusu, you will find houses resting on the water.","byZh":"杜荀鹤《送人游吴》","byEn":"Du Xunhe","kindZh":"文学","kindEn":"Literature"},{"zh":"上有天堂，下有苏杭。","en":"There is paradise above, and Suzhou and Hangzhou below.","byZh":"民间谚语","byEn":"Chinese proverb","kindZh":"谚语","kindEn":"Proverb"}]},{"id":"wuhan","zh":"武汉","en":"Wuhan","countryZh":"中国","countryEn":"China","continent":"亚洲","region":"东亚","lat":30.5928,"lon":114.3055,"climate":"亚热带季风气候","popWan":1377,"areaKm2":8569,"nickname":"九省通衢","landmarks":["黄鹤楼","东湖","长江大桥"],"tags":["江湖","码头","热干面"],"note":"","tz":"Asia/Shanghai","quote":{"text":"黄鹤一去不复返，白云千载空悠悠。","author":"崔颢《黄鹤楼》"},"foods":{"zh":["热干面","武昌鱼","藕汤"],"en":["Hot Dry Noodles","Wuchang Fish","Lotus Root Soup"]},"landmarksEn":["Yellow Crane Tower","East Lake","Yangtze River Bridge"],"tagline":null,"quoteEn":{"text":"The yellow crane is gone, never to return; white clouds drift idly through the ages.","author":"Cui Hao, Yellow Crane Tower"},"continentEn":"Asia","regionEn":"East Asia","climateEn":"Subtropical monsoon climate","lines":[{"zh":"黄鹤一去不复返，白云千载空悠悠。","en":"The yellow crane is gone for good; white clouds drift for a thousand years.","byZh":"崔颢《黄鹤楼》","byEn":"Cui Hao","kindZh":"文学","kindEn":"Literature"},{"zh":"晴川历历汉阳树，芳草萋萋鹦鹉洲。","en":"Clear river, distinct trees of Hanyang; lush grass on Parrot Isle.","byZh":"崔颢《黄鹤楼》","byEn":"Cui Hao","kindZh":"文学","kindEn":"Literature"}]},{"id":"changsha","zh":"长沙","en":"Changsha","countryZh":"中国","countryEn":"China","continent":"亚洲","region":"东亚","lat":28.2282,"lon":112.9388,"climate":"亚热带季风气候","popWan":1051,"areaKm2":11819,"nickname":"星城","landmarks":["橘子洲","岳麓山","湖南省博物馆"],"tags":["娱乐","湘味","夜生活"],"note":"","tz":"Asia/Shanghai","quote":null,"foods":{"zh":["臭豆腐","剁椒鱼头","糖油粑粑"],"en":["Stinky Tofu","Chopped Chili Fish Head","Fried Glutinous Rice Cake"]},"landmarksEn":["Orange Isle","Yuelu Mountain","Hunan Museum"],"tagline":null,"quoteEn":null,"continentEn":"Asia","regionEn":"East Asia","climateEn":"Subtropical monsoon climate","lines":[]},{"id":"xiamen","zh":"厦门","en":"Xiamen","countryZh":"中国","countryEn":"China","continent":"亚洲","region":"东亚","lat":24.4798,"lon":118.0894,"climate":"亚热带季风气候","popWan":532,"areaKm2":1700,"nickname":"鹭岛","landmarks":["鼓浪屿","环岛路","南普陀寺"],"tags":["海岛","文艺","咖啡"],"note":"","tz":"Asia/Shanghai","quote":null,"foods":{"zh":["沙茶面","海蛎煎","土笋冻"],"en":["Satay Noodles","Oyster Omelet","Tusundong"]},"landmarksEn":["Gulangyu","Ring Island Road","Nanputuo Temple"],"tagline":null,"quoteEn":null,"continentEn":"Asia","regionEn":"East Asia","climateEn":"Subtropical monsoon climate","lines":[{"zh":"海上花园。","en":"A garden upon the sea.","byZh":"城市别称","byEn":"City epithet","kindZh":"城市逸闻","kindEn":"Local lore"}]},{"id":"qingdao","zh":"青岛","en":"Qingdao","countryZh":"中国","countryEn":"China","continent":"亚洲","region":"东亚","lat":36.0671,"lon":120.3826,"climate":"温带季风气候","popWan":1037,"areaKm2":11293,"nickname":"帆船之都","landmarks":["栈桥","八大关","崂山"],"tags":["海滨","啤酒","红瓦"],"note":"","tz":"Asia/Shanghai","quote":null,"foods":{"zh":["青岛啤酒","海鲜","鲅鱼水饺"],"en":["Qingdao Beer","Seafood","Spanish Mackerel Dumplings"]},"landmarksEn":["Zhanqiao Pier","Badaguan","Laoshan Mountain"],"tagline":null,"quoteEn":null,"continentEn":"Asia","regionEn":"East Asia","climateEn":"Temperate monsoon climate","lines":[{"zh":"红瓦绿树，碧海蓝天。","en":"Red tiles, green trees, blue sea and sky.","byZh":"康有为评青岛","byEn":"Kang Youwei on Qingdao","kindZh":"名言","kindEn":"Quote"}]},{"id":"dalian","zh":"大连","en":"Dalian","countryZh":"中国","countryEn":"China","continent":"亚洲","region":"东亚","lat":38.914,"lon":121.6147,"climate":"温带季风气候","popWan":753,"areaKm2":12574,"nickname":"北方明珠","landmarks":["星海广场","老虎滩","旅顺口"],"tags":["海滨","广场","海鲜"],"note":"","tz":"Asia/Shanghai","quote":null,"foods":{"zh":["海鲜","焖子","樱桃"],"en":["Seafood","Menzi","Cherries"]},"landmarksEn":["Xinghai Square","Laohutan","Dalian Port"],"tagline":null,"quoteEn":null,"continentEn":"Asia","regionEn":"East Asia","climateEn":"Temperate monsoon climate","lines":[]},{"id":"tianjin","zh":"天津","en":"Tianjin","countryZh":"中国","countryEn":"China","continent":"亚洲","region":"东亚","lat":39.3434,"lon":117.3616,"climate":"温带季风气候","popWan":1364,"areaKm2":11966,"nickname":"津门","landmarks":["天津之眼","五大道","古文化街"],"tags":["相声","租界","港口"],"note":"","tz":"Asia/Shanghai","quote":null,"foods":{"zh":["狗不理包子","煎饼果子","耳朵眼炸糕"],"en":["Goubuli Baozi","Jianbing","Erduoyan Fried Cake"]},"landmarksEn":["Tianjin Eye","Wudadao","Ancient Culture Street"],"tagline":null,"quoteEn":null,"continentEn":"Asia","regionEn":"East Asia","climateEn":"Temperate monsoon climate","lines":[{"zh":"津门。","en":"The Gate of Tianjin — the gateway to the capital.","byZh":"城市别称","byEn":"City epithet","kindZh":"城市逸闻","kindEn":"Local lore"}]},{"id":"kunming","zh":"昆明","en":"Kunming","countryZh":"中国","countryEn":"China","continent":"亚洲","region":"东亚","lat":24.8801,"lon":102.8329,"climate":"亚热带高原气候","popWan":868,"areaKm2":21013,"nickname":"春城","landmarks":["滇池","石林","翠湖"],"tags":["鲜花","四季如春","慢生活"],"note":"","tz":"Asia/Shanghai","quote":null,"foods":{"zh":["过桥米线","鲜花饼","野生菌"],"en":["Crossing-the-bridge Noodles","Flower Cake","Wild Mushrooms"]},"landmarksEn":["Dianchi Lake","Stone Forest","Green Lake"],"tagline":null,"quoteEn":null,"continentEn":"Asia","regionEn":"East Asia","climateEn":"Subtropical plateau climate","lines":[{"zh":"天气常如二三月，花枝不断四时春。","en":"The weather stays like early spring; flowers bloom through all four seasons.","byZh":"杨慎《滇海曲》","byEn":"Yang Shen","kindZh":"文学","kindEn":"Literature"},{"zh":"春城无处不飞花。","en":"In the spring city, flowers fly everywhere.","byZh":"化用韩翃诗句","byEn":"After Han Hong","kindZh":"文学","kindEn":"Literature"}]},{"id":"lijiang","zh":"丽江","en":"Lijiang","countryZh":"中国","countryEn":"China","continent":"亚洲","region":"东亚","lat":26.8721,"lon":100.233,"climate":"高原山地气候","popWan":125,"areaKm2":20600,"nickname":"艳遇之都","landmarks":["丽江古城","玉龙雪山","泸沽湖"],"tags":["雪山","纳西","慢时光"],"note":"丽江市数据","tz":"Asia/Shanghai","quote":null,"foods":{"zh":["腊排骨","鸡豆凉粉","纳西烤鱼"],"en":["Cured Pork Ribs","Chickpea Jelly","Naxi Grilled Fish"]},"landmarksEn":["Lijiang Old Town","Jade Dragon Snow Mountain","Lugu Lake"],"tagline":null,"quoteEn":null,"continentEn":"Asia","regionEn":"East Asia","climateEn":"Alpine mountain climate","lines":[]},{"id":"lhasa","zh":"拉萨","en":"Lhasa","countryZh":"中国","countryEn":"China","continent":"亚洲","region":"东亚","lat":29.652,"lon":91.1721,"climate":"高原山地气候","popWan":87,"areaKm2":29640,"nickname":"日光城","landmarks":["布达拉宫","大昭寺","八廓街"],"tags":["信仰","高原","转经"],"note":"","tz":"Asia/Shanghai","quote":null,"foods":{"zh":["酥油茶","糌粑","牦牛肉"],"en":["Butter Tea","Tsampa","Yak Beef"]},"landmarksEn":["Potala Palace","Jokhang Temple","Barkhor Street"],"tagline":null,"quoteEn":null,"continentEn":"Asia","regionEn":"East Asia","climateEn":"Alpine mountain climate","lines":[{"zh":"日光城。","en":"The Sunlit City — a name earned by its clear, bright skies.","byZh":"城市别称","byEn":"City epithet","kindZh":"城市逸闻","kindEn":"Local lore"}]},{"id":"harbin","zh":"哈尔滨","en":"Harbin","countryZh":"中国","countryEn":"China","continent":"亚洲","region":"东亚","lat":45.8038,"lon":126.535,"climate":"温带季风气候","popWan":939,"areaKm2":53100,"nickname":"冰城","landmarks":["中央大街","冰雪大世界","索菲亚教堂"],"tags":["冰雪","俄式","啤酒"],"note":"","tz":"Asia/Shanghai","quote":null,"foods":{"zh":["哈尔滨红肠","马迭尔冰棍","锅包肉"],"en":["Harbin Sausage","Modern Ice Cream","Guobaorou"]},"landmarksEn":["Central Street","Ice and Snow World","Saint Sophia Church"],"tagline":null,"quoteEn":null,"continentEn":"Asia","regionEn":"East Asia","climateEn":"Temperate monsoon climate","lines":[{"zh":"冰城。","en":"The Ice City.","byZh":"城市别称","byEn":"City epithet","kindZh":"城市逸闻","kindEn":"Local lore"}]},{"id":"sanya","zh":"三亚","en":"Sanya","countryZh":"中国","countryEn":"China","continent":"亚洲","region":"东亚","lat":18.2528,"lon":109.5119,"climate":"热带季风气候","popWan":108,"areaKm2":1921,"nickname":"东方夏威夷","landmarks":["亚龙湾","天涯海角","蜈支洲岛"],"tags":["海岛","度假","椰林"],"note":"","tz":"Asia/Shanghai","quote":null,"foods":{"zh":["文昌鸡","椰子饭","海鲜"],"en":["Wenchang Chicken","Coconut Rice","Seafood"]},"landmarksEn":["Yalong Bay","Tianya Haijiao","Wuzhizhou Island"],"tagline":null,"quoteEn":null,"continentEn":"Asia","regionEn":"East Asia","climateEn":"Tropical monsoon climate","lines":[]},{"id":"guilin","zh":"桂林","en":"Guilin","countryZh":"中国","countryEn":"China","continent":"亚洲","region":"东亚","lat":25.2736,"lon":110.2905,"climate":"亚热带季风气候","popWan":500,"areaKm2":27800,"nickname":"山水甲天下","landmarks":["漓江","象鼻山","阳朔"],"tags":["喀斯特","山水","竹筏"],"note":"","tz":"Asia/Shanghai","quote":{"text":"桂林山水甲天下。","author":"民间俗语"},"foods":{"zh":["桂林米粉","啤酒鱼","荔浦芋扣肉"],"en":["Guilin Rice Noodles","Beer Fish","Taro Pork"]},"landmarksEn":["Li River","Elephant Trunk Hill","Yangshuo"],"tagline":null,"quoteEn":{"text":"Guilin's hills and waters are the finest under heaven.","author":"Chinese proverb"},"continentEn":"Asia","regionEn":"East Asia","climateEn":"Subtropical monsoon climate","lines":[{"zh":"桂林山水甲天下。","en":"Guilin's scenery is the finest under heaven.","byZh":"民间谚语","byEn":"Chinese proverb","kindZh":"谚语","kindEn":"Proverb"},{"zh":"舟行碧波上，人在画中游。","en":"Boating on emerald waves, one travels through a painting.","byZh":"课文名句","byEn":"Classic line","kindZh":"俗语","kindEn":"Saying"}]},{"id":"hongkong","zh":"中国香港","en":"Hong Kong, China","countryZh":"中国","countryEn":"China","continent":"亚洲","region":"东亚","lat":22.3193,"lon":114.1694,"climate":"亚热带季风气候","popWan":750,"areaKm2":1114,"nickname":"东方之珠","landmarks":["维多利亚港","太平山","庙街"],"tags":["金融","霓虹","茶餐厅"],"note":"中国香港特别行政区","tz":"Asia/Hong_Kong","quote":null,"foods":{"zh":["点心","烧鹅","丝袜奶茶"],"en":["Dim Sum","Roast Goose","Silk Stocking Milk Tea"]},"landmarksEn":["Victoria Harbour","The Peak","Tian Tan Buddha"],"tagline":null,"quoteEn":null,"continentEn":"Asia","regionEn":"East Asia","climateEn":"Subtropical monsoon climate","lines":[]},{"id":"macau","zh":"中国澳门","en":"Macao, China","countryZh":"中国","countryEn":"China","continent":"亚洲","region":"东亚","lat":22.1987,"lon":113.5439,"climate":"亚热带季风气候","popWan":68,"areaKm2":33,"nickname":"东方赌城","landmarks":["大三巴","议事亭前地","威尼斯人"],"tags":["赌场","葡式","小吃"],"note":"中国澳门特别行政区","tz":"Asia/Macau","quote":null,"foods":{"zh":["葡式蛋挞","猪扒包","杏仁饼"],"en":["Portuguese Egg Tart","Pork Chop Bun","Almond Cake"]},"landmarksEn":["Ruins of St. Paul's","Grand Lisboa","A-Ma Temple"],"tagline":null,"quoteEn":null,"continentEn":"Asia","regionEn":"East Asia","climateEn":"Subtropical monsoon climate","lines":[]},{"id":"taipei","zh":"中国台湾·台北","en":"Taipei, China","countryZh":"中国","countryEn":"China","continent":"亚洲","region":"东亚","lat":25.033,"lon":121.5654,"climate":"亚热带季风气候","popWan":251,"areaKm2":272,"nickname":"不夜城","landmarks":["101大楼","故宫博物院","士林夜市"],"tags":["小吃","霓虹","温泉"],"note":"中国台湾省台北市辖区","tz":"Asia/Taipei","quote":null,"foods":{"zh":["牛肉面","蚵仔煎","珍珠奶茶"],"en":["Beef Noodles","Oyster Omelet","Bubble Tea"]},"landmarksEn":["Taipei 101","Chiang Kai-shek Memorial","Jiufen"],"tagline":null,"quoteEn":null,"continentEn":"Asia","regionEn":"East Asia","climateEn":"Subtropical monsoon climate","lines":[]},{"id":"tokyo","zh":"东京","en":"Tokyo","countryZh":"日本","countryEn":"Japan","continent":"亚洲","region":"东亚","lat":35.6762,"lon":139.6503,"climate":"亚热带季风气候","popWan":1400,"areaKm2":2194,"nickname":"潮流引力场","landmarks":["浅草寺","涩谷十字路口","东京塔"],"tags":["潮流","拉面","秩序"],"note":"东京都人口","tz":"Asia/Tokyo","quote":null,"foods":{"zh":["寿司","拉面","天妇罗"],"en":["Sushi","Ramen","Tempura"]},"landmarksEn":["Senso-ji","Shibuya Crossing","Tokyo Skytree"],"tagline":{"zh":"秩序与霓虹，在同一条街上互不打扰。","en":"Order and neon keep their distance on the same street."},"quoteEn":null,"continentEn":"Asia","regionEn":"East Asia","climateEn":"Subtropical monsoon climate","lines":[{"zh":"东京的月亮，照旧是同一轮。","en":"Over Tokyo, the moon is the same old moon.","byZh":"城市说法","byEn":"City saying","kindZh":"俗语","kindEn":"Saying"},{"zh":"漫步东京，你会发现秩序与温柔并存。","en":"Stroll through Tokyo and you will find order and gentleness side by side.","byZh":"城市说法","byEn":"City saying","kindZh":"俗语","kindEn":"Saying"},{"zh":"古池塘，青蛙跳入水中央，一声响。","en":"The old pond — a frog leaps in, the sound of water.","byZh":"松尾芭蕉《奥之细道》","byEn":"Matsuo Basho","kindZh":"文学","kindEn":"Literature"},{"zh":"秩序与霓虹，在同一条街上互不打扰。","en":"Order and neon keep their distance on the same street.","byZh":"城签短句","byEn":"City Sign line","kindZh":"短句","kindEn":"Original line"}]},{"id":"kyoto","zh":"京都","en":"Kyoto","countryZh":"日本","countryEn":"Japan","continent":"亚洲","region":"东亚","lat":35.0116,"lon":135.7681,"climate":"亚热带湿润气候","popWan":146,"areaKm2":827,"nickname":"千年古都","landmarks":["清水寺","金阁寺","岚山竹林"],"tags":["古寺","枯山水","艺伎"],"note":"","tz":"Asia/Tokyo","quote":null,"foods":{"zh":["怀石料理","抹茶","汤豆腐"],"en":["Kaiseki","Matcha","Yudofu"]},"landmarksEn":["Fushimi Inari","Kiyomizu-dera","Arashiyama"],"tagline":null,"quoteEn":null,"continentEn":"Asia","regionEn":"East Asia","climateEn":"Humid subtropical climate","lines":[{"zh":"千年古都。","en":"A capital of a thousand years.","byZh":"城市别称","byEn":"City epithet","kindZh":"城市逸闻","kindEn":"Local lore"},{"zh":"京都的四季，是四位不同的美人。","en":"Kyoto's four seasons are four different beauties.","byZh":"城市说法","byEn":"City saying","kindZh":"俗语","kindEn":"Saying"},{"zh":"人生如朝露。","en":"Life is like the morning dew.","byZh":"平安时代物语名句","byEn":"Heian-era literary saying","kindZh":"文学","kindEn":"Literature"}]},{"id":"osaka","zh":"大阪","en":"Osaka","countryZh":"日本","countryEn":"Japan","continent":"亚洲","region":"东亚","lat":34.6937,"lon":135.5023,"climate":"亚热带湿润气候","popWan":275,"areaKm2":225,"nickname":"天下的厨房","landmarks":["大阪城","道顿堀","环球影城"],"tags":["美食","关西","烟火"],"note":"","tz":"Asia/Tokyo","quote":null,"foods":{"zh":["章鱼烧","大阪烧","串炸"],"en":["Takoyaki","Okonomiyaki","Kushikatsu"]},"landmarksEn":["Osaka Castle","Dotonbori","Sentenji"],"tagline":null,"quoteEn":null,"continentEn":"Asia","regionEn":"East Asia","climateEn":"Humid subtropical climate","lines":[]},{"id":"seoul","zh":"首尔","en":"Seoul","countryZh":"韩国","countryEn":"South Korea","continent":"亚洲","region":"东亚","lat":37.5665,"lon":126.978,"climate":"温带季风气候","popWan":940,"areaKm2":605,"nickname":"韩流之都","landmarks":["景福宫","明洞","南山塔"],"tags":["潮流","韩餐","汉江"],"note":"","tz":"Asia/Seoul","quote":null,"foods":{"zh":["泡菜","韩式烤肉","参鸡汤"],"en":["Kimchi","Korean BBQ","Samgyetang"]},"landmarksEn":["Gyeongbokgung","N Seoul Tower","Myeongdong"],"tagline":null,"quoteEn":null,"continentEn":"Asia","regionEn":"East Asia","climateEn":"Temperate monsoon climate","lines":[{"zh":"汉江流淌着首尔的日与夜。","en":"The Han River carries Seoul's days and nights.","byZh":"城市说法","byEn":"City saying","kindZh":"俗语","kindEn":"Saying"}]},{"id":"bangkok","zh":"曼谷","en":"Bangkok","countryZh":"泰国","countryEn":"Thailand","continent":"亚洲","region":"东南亚","lat":13.7563,"lon":100.5018,"climate":"热带季风气候","popWan":1050,"areaKm2":1569,"nickname":"天使之城","landmarks":["大皇宫","水上市场","考山路"],"tags":["寺庙","嘟嘟车","芒果饭"],"note":"","tz":"Asia/Bangkok","quote":null,"foods":{"zh":["冬阴功","芒果糯米饭","泰式炒河粉"],"en":["Tom Yum","Mango Sticky Rice","Pad Thai"]},"landmarksEn":["Grand Palace","Wat Pho","Chatuchak Market"],"tagline":null,"quoteEn":null,"continentEn":"Asia","regionEn":"Southeast Asia","climateEn":"Tropical monsoon climate","lines":[{"zh":"在曼谷，微笑是一种通用语言。","en":"In Bangkok, a smile is a universal language.","byZh":"城市说法","byEn":"City saying","kindZh":"俗语","kindEn":"Saying"}]},{"id":"singapore","zh":"新加坡","en":"Singapore","countryZh":"新加坡","countryEn":"Singapore","continent":"亚洲","region":"东南亚","lat":1.3521,"lon":103.8198,"climate":"热带雨林气候","popWan":592,"areaKm2":734,"nickname":"花园城市","landmarks":["滨海湾花园","鱼尾狮","圣淘沙"],"tags":["整洁","多元","美食"],"note":"","tz":"Asia/Singapore","quote":null,"foods":{"zh":["辣椒螃蟹","海南鸡饭","叻沙"],"en":["Chili Crab","Hainanese Chicken Rice","Laksa"]},"landmarksEn":["Marina Bay Sands","Gardens by the Bay","Sentosa"],"tagline":null,"quoteEn":null,"continentEn":"Asia","regionEn":"Southeast Asia","climateEn":"Tropical rainforest climate","lines":[{"zh":"小国大城。","en":"A small nation, a great city.","byZh":"城市说法","byEn":"City saying","kindZh":"俗语","kindEn":"Saying"}]},{"id":"kualalumpur","zh":"吉隆坡","en":"Kuala Lumpur","countryZh":"马来西亚","countryEn":"Malaysia","continent":"亚洲","region":"东南亚","lat":3.139,"lon":101.6869,"climate":"热带雨林气候","popWan":198,"areaKm2":243,"nickname":"双子塔之城","landmarks":["双子塔","茨厂街","黑风洞"],"tags":["多元","榴莲","夜市"],"note":"","tz":"Asia/Kuala_Lumpur","quote":null,"foods":{"zh":["肉骨茶","沙爹","椰浆饭"],"en":["Bak Kut Teh","Satay","Nasi Lemak"]},"landmarksEn":["Petronas Twin Towers","Batu Caves","Merdeka Square"],"tagline":null,"quoteEn":null,"continentEn":"Asia","regionEn":"Southeast Asia","climateEn":"Tropical rainforest climate","lines":[]},{"id":"hanoi","zh":"河内","en":"Hanoi","countryZh":"越南","countryEn":"Vietnam","continent":"亚洲","region":"东南亚","lat":21.0278,"lon":105.8342,"climate":"热带季风气候","popWan":843,"areaKm2":3360,"nickname":"千年文物之地","landmarks":["还剑湖","三十六行街","文庙"],"tags":["法式","滴漏咖啡","米粉"],"note":"","tz":"Asia/Ho_Chi_Minh","quote":null,"foods":{"zh":["河粉","春卷","越南咖啡"],"en":["Pho","Spring Rolls","Vietnamese Coffee"]},"landmarksEn":["Hoan Kiem Lake","Temple of Literature","Halong Bay"],"tagline":null,"quoteEn":null,"continentEn":"Asia","regionEn":"Southeast Asia","climateEn":"Tropical monsoon climate","lines":[{"zh":"还剑湖的水，记得这座城的千年。","en":"The water of Hoan Kiem Lake remembers a thousand years.","byZh":"城市说法","byEn":"City saying","kindZh":"俗语","kindEn":"Saying"}]},{"id":"jakarta","zh":"雅加达","en":"Jakarta","countryZh":"印度尼西亚","countryEn":"Indonesia","continent":"亚洲","region":"东南亚","lat":-6.2088,"lon":106.8456,"climate":"热带雨林气候","popWan":1056,"areaKm2":662,"nickname":"大榴莲","landmarks":["独立广场","缩影公园","老城区"],"tags":["群岛","湿热","摩托车"],"note":"","tz":"Asia/Jakarta","quote":null,"foods":{"zh":["炒饭","沙嗲","辣椒酱"],"en":["Nasi Goreng","Satay","Sambal"]},"landmarksEn":["Monas","Kota Tua","Taman Mini"],"tagline":null,"quoteEn":null,"continentEn":"Asia","regionEn":"Southeast Asia","climateEn":"Tropical rainforest climate","lines":[]},{"id":"manila","zh":"马尼拉","en":"Manila","countryZh":"菲律宾","countryEn":"Philippines","continent":"亚洲","region":"东南亚","lat":14.5995,"lon":120.9842,"climate":"热带季风气候","popWan":184,"areaKm2":43,"nickname":"千岛之国门户","landmarks":["黎刹公园","圣地亚哥古堡","马尼拉湾"],"tags":["教会","吉普尼","落日"],"note":"马尼拉市，都会区人口逾千万","tz":"Asia/Manila","quote":null,"foods":{"zh":["烤乳猪","菲式冰品"," adobo"],"en":["Lechon","Halo-halo","Adobo"]},"landmarksEn":["Intramuros","Rizal Park","Baywalk"],"tagline":null,"quoteEn":null,"continentEn":"Asia","regionEn":"Southeast Asia","climateEn":"Tropical monsoon climate","lines":[]},{"id":"chiangmai","zh":"清迈","en":"Chiang Mai","countryZh":"泰国","countryEn":"Thailand","continent":"亚洲","region":"东南亚","lat":18.7883,"lon":98.9853,"climate":"热带季风气候","popWan":13,"areaKm2":40,"nickname":"北方玫瑰","landmarks":["古城","素贴山","宁曼路"],"tags":["慢生活","寺庙","咖啡"],"note":"清迈市区，府治约 180 万","tz":"Asia/Bangkok","quote":null,"foods":{"zh":["咖喱面","芒果糯米饭","泰北香肠"],"en":["Khao Soi","Mango Sticky Rice","Sai Oua"]},"landmarksEn":["Wat Phra That Doi Suthep","Night Bazaar","Grand Canyon"],"tagline":null,"quoteEn":null,"continentEn":"Asia","regionEn":"Southeast Asia","climateEn":"Tropical monsoon climate","lines":[]},{"id":"denpasar","zh":"登巴萨","en":"Denpasar","countryZh":"印度尼西亚","countryEn":"Indonesia","continent":"亚洲","region":"东南亚","lat":-8.65,"lon":115.2167,"climate":"热带季风气候","popWan":73,"areaKm2":126,"nickname":"巴厘之门","landmarks":["海神庙","乌布","库塔海滩"],"tags":["海岛","印度教","稻田"],"note":"巴厘岛首府","tz":"Asia/Makassar","quote":null,"foods":{"zh":["烤猪饭","沙嗲","巴厘咖啡"],"en":["Babi Guling","Satay","Balinese Coffee"]},"landmarksEn":["Tanah Lot","Uluwatu","Besakih Temple"],"tagline":null,"quoteEn":null,"continentEn":"Asia","regionEn":"Southeast Asia","climateEn":"Tropical monsoon climate","lines":[]},{"id":"delhi","zh":"德里","en":"Delhi","countryZh":"印度","countryEn":"India","continent":"亚洲","region":"南亚","lat":28.6139,"lon":77.209,"climate":"热带季风气候","popWan":2000,"areaKm2":1484,"nickname":"莫卧儿余晖","landmarks":["红堡","胡马雍陵","莲花庙"],"tags":["香料","纱丽","喧闹"],"note":"印度国家首都辖区，含新德里","tz":"Asia/Kolkata","quote":null,"foods":{"zh":["咖喱","烤饼","印度炒饭"],"en":["Curry","Naan","Biryani"]},"landmarksEn":["Red Fort","Qutub Minar","India Gate"],"tagline":null,"quoteEn":null,"continentEn":"Asia","regionEn":"South Asia","climateEn":"Tropical monsoon climate","lines":[{"zh":"德里是七座城市叠出来的。","en":"Delhi is seven cities stacked upon one another.","byZh":"城市说法","byEn":"City saying","kindZh":"俗语","kindEn":"Saying"}]},{"id":"mumbai","zh":"孟买","en":"Mumbai","countryZh":"印度","countryEn":"India","continent":"亚洲","region":"南亚","lat":19.076,"lon":72.8777,"climate":"热带季风气候","popWan":1242,"areaKm2":603,"nickname":"宝莱坞之城","landmarks":["印度门","海滨大道","贾特拉帕蒂·希瓦吉终点站"],"tags":["宝莱坞","金融","雨季"],"note":"","tz":"Asia/Kolkata","quote":null,"foods":{"zh":["咖喱角","印度薄饼","奶茶"],"en":["Samosa","Dosa","Masala Chai"]},"landmarksEn":["Gateway of India","Marine Drive","Elephanta Caves"],"tagline":null,"quoteEn":null,"continentEn":"Asia","regionEn":"South Asia","climateEn":"Tropical monsoon climate","lines":[{"zh":"孟买从不入睡，只是偶尔闭上眼睛。","en":"Mumbai never sleeps; it only closes its eyes at times.","byZh":"城市说法","byEn":"City saying","kindZh":"俗语","kindEn":"Saying"},{"zh":"世界以痛吻我，要我报之以歌。","en":"The world has kissed my soul with its pain, asking for its return in songs.","byZh":"泰戈尔《飞鸟集》","byEn":"Rabindranath Tagore","kindZh":"文学","kindEn":"Literature"}]},{"id":"kathmandu","zh":"加德满都","en":"Kathmandu","countryZh":"尼泊尔","countryEn":"Nepal","continent":"亚洲","region":"南亚","lat":27.7172,"lon":85.324,"climate":"高原季风气候","popWan":84,"areaKm2":49,"nickname":"寺庙之城","landmarks":["杜巴广场","斯瓦扬布纳特寺","帕斯帕提那寺"],"tags":["雪山","经幡","朝圣"],"note":"","tz":"Asia/Kathmandu","quote":null,"foods":{"zh":["摩摩","达尔汤","藏面"],"en":["Momos","Dal Soup","Tibetan Noodles"]},"landmarksEn":["Durbar Square","Boudhanath","Swayambhunath"],"tagline":null,"quoteEn":null,"continentEn":"Asia","regionEn":"South Asia","climateEn":"Highland monsoon climate","lines":[]},{"id":"dubai","zh":"迪拜","en":"Dubai","countryZh":"阿联酋","countryEn":"UAE","continent":"亚洲","region":"西亚","lat":25.2048,"lon":55.2708,"climate":"热带沙漠气候","popWan":355,"areaKm2":4114,"nickname":"沙漠中的未来城","landmarks":["哈利法塔","棕榈岛","迪拜购物中心"],"tags":["奢华","摩天楼","沙漠"],"note":"","tz":"Asia/Dubai","quote":null,"foods":{"zh":["阿拉伯咖啡","椰枣","沙威玛"],"en":["Arabic Coffee","Dates","Shawarma"]},"landmarksEn":["Burj Khalifa","Dubai Mall","Palm Jumeirah"],"tagline":null,"quoteEn":null,"continentEn":"Asia","regionEn":"West Asia","climateEn":"Hot desert climate","lines":[{"zh":"沙漠里也能长出摩天楼。","en":"Even in the desert, skyscrapers can grow.","byZh":"城市说法","byEn":"City saying","kindZh":"俗语","kindEn":"Saying"}]},{"id":"istanbul","zh":"伊斯坦布尔","en":"Istanbul","countryZh":"土耳其","countryEn":"Türkiye","continent":"亚洲","region":"西亚","lat":41.0082,"lon":28.9784,"climate":"地中海气候","popWan":1584,"areaKm2":5343,"nickname":"欧亚交汇之城","landmarks":["圣索菲亚","蓝色清真寺","博斯普鲁斯海峡"],"tags":["海峡","烤肉","巴扎"],"note":"","tz":"Europe/Istanbul","quote":null,"foods":{"zh":["烤肉","土耳其软糖","红茶"],"en":["Kebab","Turkish Delight","Black Tea"]},"landmarksEn":["Hagia Sophia","Grand Bazaar","Bosphorus"],"tagline":null,"quoteEn":null,"continentEn":"Asia","regionEn":"West Asia","climateEn":"Mediterranean climate","lines":[{"zh":"买家要懂得货，伊斯坦布尔要懂人心。","en":"He who buys must know the goods; Istanbul knows the heart.","byZh":"土耳其俗语","byEn":"Turkish saying","kindZh":"俗语","kindEn":"Saying"},{"zh":"一城跨两洲。","en":"One city, two continents.","byZh":"城市印象","byEn":"City impression","kindZh":"城市逸闻","kindEn":"Local lore"},{"zh":"这座城市的忧郁，是一种可以触摸的颜色。","en":"The melancholy of this city is a colour you can touch.","byZh":"奥尔罕·帕慕克《伊斯坦布尔》","byEn":"Orhan Pamuk","kindZh":"文学","kindEn":"Literature"}]},{"id":"riyadh","zh":"利雅得","en":"Riyadh","countryZh":"沙特阿拉伯","countryEn":"Saudi Arabia","continent":"亚洲","region":"西亚","lat":24.7136,"lon":46.6753,"climate":"热带沙漠气候","popWan":767,"areaKm2":1800,"nickname":"沙漠绿洲","landmarks":["王国中心","马斯马克堡垒","德拉伊耶"],"tags":["沙漠","石油","新城"],"note":"","tz":"Asia/Riyadh","quote":null,"foods":{"zh":["椰枣","阿拉伯咖啡","卡布萨"],"en":["Dates","Arabic Coffee","Kabsa"]},"landmarksEn":["Kingdom Centre","Al Masmak","Edge of the World"],"tagline":null,"quoteEn":null,"continentEn":"Asia","regionEn":"West Asia","climateEn":"Hot desert climate","lines":[]},{"id":"almaty","zh":"阿拉木图","en":"Almaty","countryZh":"哈萨克斯坦","countryEn":"Kazakhstan","continent":"亚洲","region":"中亚","lat":43.222,"lon":76.8512,"climate":"温带大陆性气候","popWan":211,"areaKm2":682,"nickname":"苹果之城","landmarks":["潘菲洛夫公园","升天大教堂","雪山缆车"],"tags":["雪山","苏联","苹果"],"note":"","tz":"Asia/Almaty","quote":null,"foods":{"zh":["抓饭","烤肉","马奶酒"],"en":["Plov","Kebab","Kumis"]},"landmarksEn":["Kok Tobe","Big Almaty Lake","Medeu"],"tagline":null,"quoteEn":null,"continentEn":"Asia","regionEn":"Central Asia","climateEn":"Temperate continental climate","lines":[]},{"id":"tashkent","zh":"塔什干","en":"Tashkent","countryZh":"乌兹别克斯坦","countryEn":"Uzbekistan","continent":"亚洲","region":"中亚","lat":41.2995,"lon":69.2401,"climate":"温带大陆性气候","popWan":288,"areaKm2":334,"nickname":"丝路古城","landmarks":["帖木儿广场","地铁","圆顶巴扎"],"tags":["丝路","手抓饭","地铁艺术"],"note":"","tz":"Asia/Tashkent","quote":null,"foods":{"zh":["抓饭","烤包子","酸奶"],"en":["Plov","Samsa","Yogurt"]},"landmarksEn":["Registan (nearby)","Chorsu Bazaar","Tashkent Metro"],"tagline":null,"quoteEn":null,"continentEn":"Asia","regionEn":"Central Asia","climateEn":"Temperate continental climate","lines":[]},{"id":"london","zh":"伦敦","en":"London","countryZh":"英国","countryEn":"United Kingdom","continent":"欧洲","region":"西欧","lat":51.5074,"lon":-0.1278,"climate":"温带海洋性气候","popWan":880,"areaKm2":1572,"nickname":"雾都","landmarks":["大本钟","伦敦眼","塔桥"],"tags":["王权","博物馆","雨天"],"note":"","tz":"Europe/London","quote":{"text":"当一个人厌倦了伦敦，他便也厌倦了生活。","author":"塞缪尔·约翰逊"},"foods":{"zh":["炸鱼薯条","下午茶","约克郡布丁"],"en":["Fish and Chips","Afternoon Tea","Yorkshire Pudding"]},"landmarksEn":["Big Ben","British Museum","Tower Bridge"],"tagline":{"zh":"雨雾里藏着几百年的从容。","en":"Centuries of composure, held in the rain and mist."},"quoteEn":{"text":"When a man is tired of London, he is tired of life.","author":"Samuel Johnson"},"continentEn":"Europe","regionEn":"Western Europe","climateEn":"Temperate oceanic climate","lines":[{"zh":"当一个人厌倦了伦敦，他便也厌倦了生活。","en":"When a man is tired of London, he is tired of life.","byZh":"塞缪尔·约翰逊","byEn":"Samuel Johnson","kindZh":"名言","kindEn":"Quote"},{"zh":"雾是伦敦的面纱。","en":"Fog is London's veil.","byZh":"城市说法","byEn":"City saying","kindZh":"俗语","kindEn":"Saying"},{"zh":"雨雾里藏着几百年的从容。","en":"Centuries of composure, held in the rain and mist.","byZh":"城签短句","byEn":"City Sign line","kindZh":"短句","kindEn":"Original line"}]},{"id":"paris","zh":"巴黎","en":"Paris","countryZh":"法国","countryEn":"France","continent":"欧洲","region":"西欧","lat":48.8566,"lon":2.3522,"climate":"温带海洋性气候","popWan":214,"areaKm2":105,"nickname":"光之城","landmarks":["埃菲尔铁塔","卢浮宫","塞纳河"],"tags":["浪漫","艺术","咖啡"],"note":"","tz":"Europe/Paris","quote":{"text":"如果你年轻时有幸在巴黎生活过，那么往后一生不论去向哪里，她都会与你同在——巴黎是一席流动的盛宴。","author":"欧内斯特·海明威"},"foods":{"zh":["法棍","奶酪","可颂"],"en":["Baguette","Cheese","Croissant"]},"landmarksEn":["Eiffel Tower","Louvre","Notre-Dame"],"tagline":{"zh":"把生活过成散步，是这座城最固执的主张。","en":"To live is to stroll here — the city's most stubborn idea."},"quoteEn":{"text":"If you are lucky enough to have lived in Paris as a young man, then wherever you go for the rest of your life, it stays with you, for Paris is a moveable feast.","author":"Ernest Hemingway"},"continentEn":"Europe","regionEn":"Western Europe","climateEn":"Temperate oceanic climate","lines":[{"zh":"如果你年轻时有幸在巴黎生活过，那么往后一生不论去向哪里，她都会与你同在——巴黎是一席流动的盛宴。","en":"If you were lucky enough to live in Paris when young, it stays with you wherever you go — Paris is a moveable feast.","byZh":"欧内斯特·海明威","byEn":"Ernest Hemingway","kindZh":"名言","kindEn":"Quote"},{"zh":"巴黎永远是个好主意。","en":"Paris is always a good idea.","byZh":"流传名言","byEn":"Popular saying","kindZh":"俗语","kindEn":"Saying"},{"zh":"把生活过成散步，是这座城最固执的主张。","en":"To live is to stroll here — the city's most stubborn idea.","byZh":"城签短句","byEn":"City Sign line","kindZh":"短句","kindEn":"Original line"}]},{"id":"amsterdam","zh":"阿姆斯特丹","en":"Amsterdam","countryZh":"荷兰","countryEn":"Netherlands","continent":"欧洲","region":"西欧","lat":52.3676,"lon":4.9041,"climate":"温带海洋性气候","popWan":92,"areaKm2":219,"nickname":"北方威尼斯","landmarks":["运河带","梵高博物馆","王宫"],"tags":["自行车","运河","自由"],"note":"","tz":"Europe/Amsterdam","quote":null,"foods":{"zh":["鲱鱼","苹果派","炸肉丸"],"en":["Herring","Apple Pie","Bitterballen"]},"landmarksEn":["Canal Ring","Rijksmuseum","Anne Frank House"],"tagline":null,"quoteEn":null,"continentEn":"Europe","regionEn":"Western Europe","climateEn":"Temperate oceanic climate","lines":[{"zh":"上帝创造了海洋，荷兰人创造了海岸。","en":"God created the sea; the Dutch created the coast.","byZh":"荷兰谚语","byEn":"Dutch proverb","kindZh":"谚语","kindEn":"Proverb"},{"zh":"我梦想我的画，然后我画我的梦。","en":"I dream my painting and I paint my dream.","byZh":"梵高","byEn":"Vincent van Gogh","kindZh":"名言","kindEn":"Quote"}]},{"id":"brussels","zh":"布鲁塞尔","en":"Brussels","countryZh":"比利时","countryEn":"Belgium","continent":"欧洲","region":"西欧","lat":50.8503,"lon":4.3517,"climate":"温带海洋性气候","popWan":121,"areaKm2":162,"nickname":"欧洲首都","landmarks":["大广场","尿尿小童","原子球塔"],"tags":["巧克力","欧盟","华夫饼"],"note":"","tz":"Europe/Brussels","quote":null,"foods":{"zh":["华夫饼","薯条","巧克力"],"en":["Waffles","Fries","Chocolate"]},"landmarksEn":["Grand Place","Atomium","Manneken Pis"],"tagline":null,"quoteEn":null,"continentEn":"Europe","regionEn":"Western Europe","climateEn":"Temperate oceanic climate","lines":[]},{"id":"dublin","zh":"都柏林","en":"Dublin","countryZh":"爱尔兰","countryEn":"Ireland","continent":"欧洲","region":"西欧","lat":53.3498,"lon":-6.2603,"climate":"温带海洋性气候","popWan":59,"areaKm2":115,"nickname":"文学之城","landmarks":["圣三一学院","坦普尔酒吧","半便士桥"],"tags":["文学","吉尼斯","酒吧"],"note":"","tz":"Europe/Dublin","quote":null,"foods":{"zh":["爱尔兰炖肉","健力士","苏打面包"],"en":["Irish Stew","Guinness","Soda Bread"]},"landmarksEn":["Trinity College","Temple Bar","Guinness Storehouse"],"tagline":null,"quoteEn":null,"continentEn":"Europe","regionEn":"Western Europe","climateEn":"Temperate oceanic climate","lines":[{"zh":"没有挪威人，就没有都柏林。","en":"Without the Norse, there would be no Dublin.","byZh":"城市说法","byEn":"City saying","kindZh":"俗语","kindEn":"Saying"},{"zh":"我一旦写下了「是的」，就再没有什么可以否定的了。","en":"Once I said yes, there was nothing left to deny.","byZh":"詹姆斯·乔伊斯《尤利西斯》","byEn":"James Joyce","kindZh":"文学","kindEn":"Literature"}]},{"id":"edinburgh","zh":"爱丁堡","en":"Edinburgh","countryZh":"英国","countryEn":"United Kingdom","continent":"欧洲","region":"西欧","lat":55.9533,"lon":-3.1883,"climate":"温带海洋性气候","popWan":51,"areaKm2":264,"nickname":"北方雅典","landmarks":["皇家英里","爱丁堡城堡","亚瑟王座"],"tags":["古堡","艺术节","威士忌"],"note":"","tz":"Europe/London","quote":null,"foods":{"zh":["哈吉斯","威士忌","短面包"],"en":["Haggis","Whisky","Shortbread"]},"landmarksEn":["Edinburgh Castle","Royal Mile","Arthur's Seat"],"tagline":null,"quoteEn":null,"continentEn":"Europe","regionEn":"Western Europe","climateEn":"Temperate oceanic climate","lines":[{"zh":"爱丁堡是石头的诗。","en":"Edinburgh is a poem in stone.","byZh":"城市说法","byEn":"City saying","kindZh":"俗语","kindEn":"Saying"}]},{"id":"berlin","zh":"柏林","en":"Berlin","countryZh":"德国","countryEn":"Germany","continent":"欧洲","region":"中欧","lat":52.52,"lon":13.405,"climate":"温带海洋性气候","popWan":375,"areaKm2":892,"nickname":"熊城","landmarks":["勃兰登堡门","博物馆岛","柏林墙遗址"],"tags":["历史","Techno","包容"],"note":"","tz":"Europe/Berlin","quote":null,"foods":{"zh":["德国香肠","猪肘","咖喱香肠"],"en":["Bratwurst","Pork Knuckle","Currywurst"]},"landmarksEn":["Brandenburg Gate","Museum Island","Reichstag"],"tagline":null,"quoteEn":null,"continentEn":"Europe","regionEn":"Central Europe","climateEn":"Temperate oceanic climate","lines":[{"zh":"柏林是一座永不完工的城市。","en":"Berlin is a city that is never finished.","byZh":"城市说法","byEn":"City saying","kindZh":"俗语","kindEn":"Saying"},{"zh":"密涅瓦的猫头鹰，只在黄昏起飞。","en":"The owl of Minerva spreads its wings only with the falling dusk.","byZh":"黑格尔《法哲学原理》","byEn":"Hegel","kindZh":"名言","kindEn":"Quote"}]},{"id":"munich","zh":"慕尼黑","en":"Munich","countryZh":"德国","countryEn":"Germany","continent":"欧洲","region":"中欧","lat":48.1351,"lon":11.582,"climate":"温带海洋性气候","popWan":150,"areaKm2":311,"nickname":"啤酒之都","landmarks":["玛利亚广场","宝马世界","宁芬堡宫"],"tags":["啤酒节","巴伐利亚","湖畔"],"note":"","tz":"Europe/Berlin","quote":null,"foods":{"zh":["啤酒","猪肘","椒盐卷饼"],"en":["Beer","Pork Knuckle","Pretzel"]},"landmarksEn":["Marienplatz","Neuschwanstein (nearby)","English Garden"],"tagline":null,"quoteEn":null,"continentEn":"Europe","regionEn":"Central Europe","climateEn":"Temperate oceanic climate","lines":[]},{"id":"vienna","zh":"维也纳","en":"Vienna","countryZh":"奥地利","countryEn":"Austria","continent":"欧洲","region":"中欧","lat":48.2082,"lon":16.3738,"climate":"温带海洋性气候","popWan":198,"areaKm2":415,"nickname":"音乐之都","landmarks":["美泉宫","金色大厅","圣斯蒂芬大教堂"],"tags":["音乐","咖啡","帝国"],"note":"","tz":"Europe/Vienna","quote":null,"foods":{"zh":["炸牛排","苹果卷","咖啡"],"en":["Schnitzel","Apple Strudel","Vienna Coffee"]},"landmarksEn":["Schonbrunn Palace","St. Stephen's Cathedral","Belvedere"],"tagline":null,"quoteEn":null,"continentEn":"Europe","regionEn":"Central Europe","climateEn":"Temperate oceanic climate","lines":[{"zh":"在维也纳，连空气里都飘着音乐。","en":"In Vienna, even the air carries music.","byZh":"城市说法","byEn":"City saying","kindZh":"俗语","kindEn":"Saying"},{"zh":"梦是愿望的达成。","en":"A dream is the fulfillment of a wish.","byZh":"弗洛伊德《梦的解析》","byEn":"Sigmund Freud","kindZh":"名言","kindEn":"Quote"}]},{"id":"prague","zh":"布拉格","en":"Prague","countryZh":"捷克","countryEn":"Czechia","continent":"欧洲","region":"中欧","lat":50.0755,"lon":14.4378,"climate":"温带海洋性气候","popWan":130,"areaKm2":496,"nickname":"千塔之城","landmarks":["查理大桥","布拉格城堡","老城广场"],"tags":["古堡","木偶","啤酒"],"note":"","tz":"Europe/Prague","quote":null,"foods":{"zh":["炖牛肉","啤酒","甜酒"],"en":["Goulash","Beer","Becherovka"]},"landmarksEn":["Charles Bridge","Prague Castle","Old Town Square"],"tagline":null,"quoteEn":null,"continentEn":"Europe","regionEn":"Central Europe","climateEn":"Temperate oceanic climate","lines":[{"zh":"布拉格的钟，走得比别处慢一些。","en":"Prague's clocks run a little slower than elsewhere.","byZh":"城市说法","byEn":"City saying","kindZh":"俗语","kindEn":"Saying"},{"zh":"从某一点开始便不复存在退路，这一点是能够达到的。","en":"From a certain point there is no return — that point can be reached.","byZh":"卡夫卡","byEn":"Franz Kafka","kindZh":"名言","kindEn":"Quote"}]},{"id":"budapest","zh":"布达佩斯","en":"Budapest","countryZh":"匈牙利","countryEn":"Hungary","continent":"欧洲","region":"中欧","lat":47.4979,"lon":19.0402,"climate":"温带大陆性湿润气候","popWan":170,"areaKm2":525,"nickname":"多瑙河明珠","landmarks":["国会大厦","渔人堡","塞切尼链桥"],"tags":["温泉","多瑙河","新艺术"],"note":"","tz":"Europe/Budapest","quote":null,"foods":{"zh":["炖菜","烟囱卷","贵腐酒"],"en":["Goulash","Chimney Cake","Tokaji"]},"landmarksEn":["Parliament Building","Fisherman's Bastion","Chain Bridge"],"tagline":null,"quoteEn":null,"continentEn":"Europe","regionEn":"Central Europe","climateEn":"Humid continental climate","lines":[]},{"id":"zurich","zh":"苏黎世","en":"Zurich","countryZh":"瑞士","countryEn":"Switzerland","continent":"欧洲","region":"中欧","lat":47.3769,"lon":8.5417,"climate":"温带海洋性气候","popWan":43,"areaKm2":88,"nickname":"银行之城","landmarks":["班霍夫大街","苏黎世湖","老城"],"tags":["金融","雪山","手表"],"note":"","tz":"Europe/Zurich","quote":null,"foods":{"zh":["奶酪火锅","巧克力"," Rösti"],"en":["Fondue","Chocolate","Rosti"]},"landmarksEn":["Lake Zurich","Bahnhofstrasse","Uetliberg"],"tagline":null,"quoteEn":null,"continentEn":"Europe","regionEn":"Central Europe","climateEn":"Temperate oceanic climate","lines":[]},{"id":"geneva","zh":"日内瓦","en":"Geneva","countryZh":"瑞士","countryEn":"Switzerland","continent":"欧洲","region":"中欧","lat":46.2044,"lon":6.1432,"climate":"温带海洋性气候","popWan":20,"areaKm2":16,"nickname":"和平之城","landmarks":["大喷泉","万国宫","日内瓦湖"],"tags":["国际组织","手表","湖光"],"note":"","tz":"Europe/Zurich","quote":null,"foods":{"zh":["奶酪火锅","巧克力","日内瓦河鱼"],"en":["Fondue","Chocolate","Lake Fish"]},"landmarksEn":["Jet d'Eau","United Nations","Lake Geneva"],"tagline":null,"quoteEn":null,"continentEn":"Europe","regionEn":"Central Europe","climateEn":"Temperate oceanic climate","lines":[]},{"id":"rome","zh":"罗马","en":"Rome","countryZh":"意大利","countryEn":"Italy","continent":"欧洲","region":"南欧","lat":41.9028,"lon":12.4964,"climate":"地中海气候","popWan":276,"areaKm2":1285,"nickname":"永恒之城","landmarks":["斗兽场","梵蒂冈","许愿池"],"tags":["古迹","教皇","美食"],"note":"","tz":"Europe/Rome","quote":{"text":"条条大路通罗马。","author":"拉丁谚语"},"foods":{"zh":["意面","披萨","冰淇淋"],"en":["Pasta","Pizza","Gelato"]},"landmarksEn":["Colosseum","Vatican City","Trevi Fountain"],"tagline":null,"quoteEn":{"text":"All roads lead to Rome.","author":"Latin proverb"},"continentEn":"Europe","regionEn":"Southern Europe","climateEn":"Mediterranean climate","lines":[{"zh":"条条大路通罗马。","en":"All roads lead to Rome.","byZh":"拉丁谚语","byEn":"Latin proverb","kindZh":"谚语","kindEn":"Proverb"},{"zh":"罗马不是一天建成的。","en":"Rome was not built in a day.","byZh":"欧洲谚语","byEn":"European proverb","kindZh":"谚语","kindEn":"Proverb"},{"zh":"入乡随俗。","en":"When in Rome, do as the Romans do.","byZh":"英语谚语","byEn":"English proverb","kindZh":"谚语","kindEn":"Proverb"}]},{"id":"milan","zh":"米兰","en":"Milan","countryZh":"意大利","countryEn":"Italy","continent":"欧洲","region":"南欧","lat":45.4642,"lon":9.19,"climate":"湿润副热带气候","popWan":137,"areaKm2":182,"nickname":"时尚之都","landmarks":["米兰大教堂","埃马努埃莱二世长廊","斯卡拉歌剧院"],"tags":["时尚","设计","足球"],"note":"","tz":"Europe/Rome","quote":null,"foods":{"zh":["烩饭","萨拉米","提拉米苏"],"en":["Risotto","Salami","Tiramisu"]},"landmarksEn":["Duomo","Last Supper","La Scala"],"tagline":null,"quoteEn":null,"continentEn":"Europe","regionEn":"Southern Europe","climateEn":"Humid subtropical climate","lines":[{"zh":"米兰时尚，就是时间的别名。","en":"Milanese fashion is another name for time.","byZh":"城市说法","byEn":"City saying","kindZh":"俗语","kindEn":"Saying"},{"zh":"时尚会过时，风格永存。","en":"Fashions fade, style is eternal.","byZh":"常见于米兰时尚界","byEn":"Milan fashion saying","kindZh":"俗语","kindEn":"Saying"}]},{"id":"venice","zh":"威尼斯","en":"Venice","countryZh":"意大利","countryEn":"Italy","continent":"欧洲","region":"南欧","lat":45.4408,"lon":12.3155,"climate":"地中海气候","popWan":25,"areaKm2":415,"nickname":"亚得里亚海女王","landmarks":["圣马可广场","大运河","叹息桥"],"tags":["水城","贡多拉","面具"],"note":"","tz":"Europe/Rome","quote":null,"foods":{"zh":["墨鱼汁意面","咖啡","海鲜烩饭"],"en":["Squid Ink Pasta","Coffee","Seafood Risotto"]},"landmarksEn":["Grand Canal","St. Mark's Square","Rialto Bridge"],"tagline":null,"quoteEn":null,"continentEn":"Europe","regionEn":"Southern Europe","climateEn":"Mediterranean climate","lines":[{"zh":"威尼斯是建在水上的梦。","en":"Venice is a dream built upon water.","byZh":"城市说法","byEn":"City saying","kindZh":"俗语","kindEn":"Saying"},{"zh":"在威尼斯，道路就是运河。","en":"In Venice, the roads are canals.","byZh":"城市说法","byEn":"City saying","kindZh":"俗语","kindEn":"Saying"},{"zh":"在威尼斯，我学会了在迷宫里漫步的艺术。","en":"In Venice I learned the art of wandering in a labyrinth.","byZh":"城市印象","byEn":"City impression","kindZh":"城市逸闻","kindEn":"Local lore"}]},{"id":"florence","zh":"佛罗伦萨","en":"Florence","countryZh":"意大利","countryEn":"Italy","continent":"欧洲","region":"南欧","lat":43.7696,"lon":11.2558,"climate":"地中海气候","popWan":37,"areaKm2":102,"nickname":"文艺复兴之都","landmarks":["圣母百花大教堂","乌菲兹美术馆","老桥"],"tags":["艺术","文艺复兴","皮革"],"note":"","tz":"Europe/Rome","quote":{"text":"徐志摩给它取名「翡冷翠」——一座被汉语重新点亮过的城市。","author":"译名小史"},"foods":{"zh":["牛肚包","托斯卡纳红酒","冰淇淋"],"en":["Lampredotto","Chianti","Gelato"]},"landmarksEn":["Duomo","Uffizi Gallery","Ponte Vecchio"],"tagline":null,"quoteEn":{"text":"Xu Zhimo named it Fei Leng Cui — a city re-lit by the Chinese language.","author":"A note on the translated name"},"continentEn":"Europe","regionEn":"Southern Europe","climateEn":"Mediterranean climate","lines":[{"zh":"徐志摩给它取名「翡冷翠」——一座被汉语重新点亮过的城市。","en":"Xu Zhimo named it Fei Leng Cui — a city re-lit by the Chinese language.","byZh":"译名小史","byEn":"A note on the translated name","kindZh":"名言","kindEn":"Quote"},{"zh":"翡冷翠。","en":"Fei Leng Cui — the old Chinese name for Florence, coined by Xu Zhimo.","byZh":"徐志摩译名","byEn":"Xu Zhimo's rendering","kindZh":"城市逸闻","kindEn":"Local lore"},{"zh":"在人生的中途，我发现自己站在一片幽暗的森林里。","en":"In the middle of the journey of our life, I found myself in a dark wood.","byZh":"但丁《神曲·地狱篇》","byEn":"Dante, Inferno","kindZh":"文学","kindEn":"Literature"}]},{"id":"madrid","zh":"马德里","en":"Madrid","countryZh":"西班牙","countryEn":"Spain","continent":"欧洲","region":"南欧","lat":40.4168,"lon":-3.7038,"climate":"地中海气候","popWan":328,"areaKm2":604,"nickname":"阳光与艺术之都","landmarks":["普拉多博物馆","太阳门","马德里王宫"],"tags":["艺术","火腿","夜生活"],"note":"","tz":"Europe/Madrid","quote":null,"foods":{"zh":["西班牙油条","火腿","土豆蛋饼"],"en":["Churros","Jamon","Tortilla"]},"landmarksEn":["Prado Museum","Plaza Mayor","Royal Palace"],"tagline":null,"quoteEn":null,"continentEn":"Europe","regionEn":"Southern Europe","climateEn":"Mediterranean climate","lines":[{"zh":"在马德里，夜晚从九点才开始。","en":"In Madrid, the night only begins at nine.","byZh":"城市说法","byEn":"City saying","kindZh":"俗语","kindEn":"Saying"}]},{"id":"barcelona","zh":"巴塞罗那","en":"Barcelona","countryZh":"西班牙","countryEn":"Spain","continent":"欧洲","region":"南欧","lat":41.3874,"lon":2.1686,"climate":"地中海气候","popWan":166,"areaKm2":102,"nickname":"高迪之城","landmarks":["圣家堂","巴特罗之家","兰布拉大道"],"tags":["建筑","地中海","tapas"],"note":"","tz":"Europe/Madrid","quote":null,"foods":{"zh":["海鲜饭","塔帕斯","桑格利亚"],"en":["Paella","Tapas","Sangria"]},"landmarksEn":["Sagrada Familia","Park Guell","Casa Batllo"],"tagline":null,"quoteEn":null,"continentEn":"Europe","regionEn":"Southern Europe","climateEn":"Mediterranean climate","lines":[{"zh":"巴塞罗那属于海洋，也属于高迪。","en":"Barcelona belongs to the sea, and to Gaudí.","byZh":"城市说法","byEn":"City saying","kindZh":"俗语","kindEn":"Saying"}]},{"id":"lisbon","zh":"里斯本","en":"Lisbon","countryZh":"葡萄牙","countryEn":"Portugal","continent":"欧洲","region":"南欧","lat":38.7223,"lon":-9.1393,"climate":"地中海气候","popWan":55,"areaKm2":100,"nickname":"七丘之城","landmarks":["贝伦塔","阿尔法玛","28路电车"],"tags":["蛋挞","法多","大航海"],"note":"","tz":"Europe/Lisbon","quote":null,"foods":{"zh":["葡式蛋挞","鳕鱼","樱桃酒"],"en":["Pastel de Nata","Salt Cod","Ginjinha"]},"landmarksEn":["Belem Tower","Alfama","Tram 28"],"tagline":null,"quoteEn":null,"continentEn":"Europe","regionEn":"Southern Europe","climateEn":"Mediterranean climate","lines":[{"zh":"没有法多的里斯本，就像没有海的葡萄牙。","en":"Lisbon without fado is like Portugal without the sea.","byZh":"葡萄牙俗语","byEn":"Portuguese saying","kindZh":"俗语","kindEn":"Saying"}]},{"id":"athens","zh":"雅典","en":"Athens","countryZh":"希腊","countryEn":"Greece","continent":"欧洲","region":"南欧","lat":37.9838,"lon":23.7275,"climate":"地中海气候","popWan":66,"areaKm2":39,"nickname":"西方文明的摇篮","landmarks":["卫城","帕特农神庙","普拉卡"],"tags":["古希腊","大理石","海风"],"note":"","tz":"Europe/Athens","quote":null,"foods":{"zh":["羊肉卷","希腊酸奶","菲达奶酪"],"en":["Souvlaki","Greek Yogurt","Feta"]},"landmarksEn":["Acropolis","Parthenon","Plaka"],"tagline":null,"quoteEn":null,"continentEn":"Europe","regionEn":"Southern Europe","climateEn":"Mediterranean climate","lines":[{"zh":"认识你自己。","en":"Know thyself.","byZh":"德尔斐神庙箴言","byEn":"Delphic maxim","kindZh":"名言","kindEn":"Quote"},{"zh":"未经审视的人生，是不值得过的。","en":"The unexamined life is not worth living.","byZh":"苏格拉底","byEn":"Socrates","kindZh":"名言","kindEn":"Quote"}]},{"id":"stockholm","zh":"斯德哥尔摩","en":"Stockholm","countryZh":"瑞典","countryEn":"Sweden","continent":"欧洲","region":"北欧","lat":59.3293,"lon":18.0686,"climate":"温带大陆性湿润气候","popWan":98,"areaKm2":188,"nickname":"北方威尼斯","landmarks":["老城","瓦萨博物馆","地铁艺术"],"tags":["设计","群岛","极简"],"note":"","tz":"Europe/Stockholm","quote":null,"foods":{"zh":["肉桂卷","鲱鱼","黑麦面包"],"en":["Cinnamon Bun","Herring","Rye Bread"]},"landmarksEn":["Gamla Stan","Vasa Museum","Drottningholm"],"tagline":null,"quoteEn":null,"continentEn":"Europe","regionEn":"Northern Europe","climateEn":"Humid continental climate","lines":[]},{"id":"oslo","zh":"奥斯陆","en":"Oslo","countryZh":"挪威","countryEn":"Norway","continent":"欧洲","region":"北欧","lat":59.9139,"lon":10.7522,"climate":"温带大陆性湿润气候","popWan":71,"areaKm2":454,"nickname":"峡湾之门","landmarks":["维格兰雕塑公园","奥斯陆歌剧院","滑雪跳台"],"tags":["峡湾","滑雪","极光"],"note":"","tz":"Europe/Oslo","quote":null,"foods":{"zh":["三文鱼","棕色奶酪","鱼汤"],"en":["Salmon","Brown Cheese","Fish Soup"]},"landmarksEn":["Vigeland Sculpture Park","Opera House","Akershus Fortress"],"tagline":null,"quoteEn":null,"continentEn":"Europe","regionEn":"Northern Europe","climateEn":"Humid continental climate","lines":[]},{"id":"helsinki","zh":"赫尔辛基","en":"Helsinki","countryZh":"芬兰","countryEn":"Finland","continent":"欧洲","region":"北欧","lat":60.1699,"lon":24.9384,"climate":"温带大陆性湿润气候","popWan":66,"areaKm2":214,"nickname":"波罗的女儿","landmarks":["岩石教堂","港口","芬兰堡"],"tags":["桑拿","设计","白夜"],"note":"","tz":"Europe/Helsinki","quote":null,"foods":{"zh":["黑麦面包","肉桂卷","三文鱼"],"en":["Rye Bread","Cinnamon Bun","Salmon"]},"landmarksEn":["Suomenlinna","Senate Square","Temppeliaukio Church"],"tagline":null,"quoteEn":null,"continentEn":"Europe","regionEn":"Northern Europe","climateEn":"Humid continental climate","lines":[]},{"id":"copenhagen","zh":"哥本哈根","en":"Copenhagen","countryZh":"丹麦","countryEn":"Denmark","continent":"欧洲","region":"北欧","lat":55.6761,"lon":12.5683,"climate":"温带海洋性气候","popWan":66,"areaKm2":86,"nickname":"童话之都","landmarks":["新港","小美人鱼","趣伏里公园"],"tags":["自行车","北欧风","幸福"],"note":"","tz":"Europe/Copenhagen","quote":null,"foods":{"zh":["开放三明治","丹麦酥","啤酒"],"en":["Smorrebrod","Danish Pastry","Beer"]},"landmarksEn":["Nyhavn","Little Mermaid","Tivoli Gardens"],"tagline":null,"quoteEn":null,"continentEn":"Europe","regionEn":"Northern Europe","climateEn":"Temperate oceanic climate","lines":[]},{"id":"reykjavik","zh":"雷克雅未克","en":"Reykjavik","countryZh":"冰岛","countryEn":"Iceland","continent":"欧洲","region":"北欧","lat":64.1466,"lon":-21.9426,"climate":"亚极地海洋性气候","popWan":14,"areaKm2":273,"nickname":"世界最北之都","landmarks":["哈尔格林姆斯教堂","蓝湖","托宁湖"],"tags":["极光","地热","火山"],"note":"","tz":"Atlantic/Reykjavik","quote":null,"foods":{"zh":["鱼汤","黑麦面包","酸奶"],"en":["Fish Soup","Rye Bread","Skyr"]},"landmarksEn":["Hallgrimskirkja","Golden Circle","Blue Lagoon"],"tagline":null,"quoteEn":null,"continentEn":"Europe","regionEn":"Northern Europe","climateEn":"Subpolar oceanic climate","lines":[]},{"id":"moscow","zh":"莫斯科","en":"Moscow","countryZh":"俄罗斯","countryEn":"Russia","continent":"欧洲","region":"东欧","lat":55.7558,"lon":37.6173,"climate":"温带大陆性气候","popWan":1310,"areaKm2":2561,"nickname":"冰雪之都","landmarks":["红场","克里姆林宫","圣瓦西里大教堂"],"tags":["洋葱顶","芭蕾","寒冬"],"note":"","tz":"Europe/Moscow","quote":null,"foods":{"zh":["罗宋汤","饺子","黑面包"],"en":["Borscht","Pelmeni","Rye Bread"]},"landmarksEn":["Red Square","Kremlin","St. Basil's Cathedral"],"tagline":null,"quoteEn":null,"continentEn":"Europe","regionEn":"Eastern Europe","climateEn":"Temperate continental climate","lines":[{"zh":"莫斯科不相信眼泪。","en":"Moscow does not believe in tears.","byZh":"同名电影与俗语","byEn":"Film and saying","kindZh":"俗语","kindEn":"Saying"},{"zh":"幸福的家庭都是相似的，不幸的家庭各有各的不幸。","en":"Happy families are alike; each unhappy family is unhappy in its own way.","byZh":"托尔斯泰《安娜·卡列尼娜》","byEn":"Leo Tolstoy","kindZh":"文学","kindEn":"Literature"}]},{"id":"stpetersburg","zh":"圣彼得堡","en":"Saint Petersburg","countryZh":"俄罗斯","countryEn":"Russia","continent":"欧洲","region":"东欧","lat":59.9311,"lon":30.3609,"climate":"温带大陆性湿润气候","popWan":560,"areaKm2":1439,"nickname":"北方威尼斯","landmarks":["冬宫","滴血教堂","涅瓦大街"],"tags":["白夜","皇家","运河"],"note":"","tz":"Europe/Moscow","quote":null,"foods":{"zh":["罗宋汤","鱼子酱","薄饼"],"en":["Borscht","Caviar","Blini"]},"landmarksEn":["Hermitage","Peter and Paul Fortress","Neva River"],"tagline":null,"quoteEn":null,"continentEn":"Europe","regionEn":"Eastern Europe","climateEn":"Humid continental climate","lines":[{"zh":"彼得堡是俄罗斯面向欧洲的窗户。","en":"St Petersburg is Russia's window onto Europe.","byZh":"彼得一世相关说法","byEn":"Attributed to Peter the Great","kindZh":"名言","kindEn":"Quote"},{"zh":"我只能断定一件事：人是一部机器。","en":"I can only say one thing: man is a machine.","byZh":"陀思妥耶夫斯基《地下室手记》","byEn":"Dostoevsky","kindZh":"文学","kindEn":"Literature"}]},{"id":"newyork","zh":"纽约","en":"New York","countryZh":"美国","countryEn":"United States","continent":"北美洲","region":"北美","lat":40.7128,"lon":-74.006,"climate":"湿润副热带气候","popWan":838,"areaKm2":783,"nickname":"大苹果","landmarks":["自由女神","中央公园","时代广场"],"tags":["金融","百老汇","不眠"],"note":"","tz":"America/New_York","quote":{"text":"我想在那座不眠之城中醒来。","author":"歌曲《New York, New York》"},"foods":{"zh":["披萨","芝士蛋糕","百吉饼"],"en":["Pizza","Cheesecake","Bagel"]},"landmarksEn":["Central Park","Times Square","Statue of Liberty"],"tagline":{"zh":"所有来不及的回答，都交给下一步电梯。","en":"Every unanswered question rides the next elevator."},"quoteEn":{"text":"I want to wake up in that city that never sleeps.","author":"from the song New York, New York"},"continentEn":"North America","regionEn":"North America","climateEn":"Humid subtropical climate","lines":[{"zh":"我想在那座不眠之城中醒来。","en":"I want to wake up in that city that never sleeps.","byZh":"歌曲《New York, New York》","byEn":"Song 'New York, New York'","kindZh":"俗语","kindEn":"Saying"},{"zh":"如果你能在这里成功，你就能在任何地方成功。","en":"If you can make it here, you can make it anywhere.","byZh":"歌曲与城市说法","byEn":"Song and city saying","kindZh":"俗语","kindEn":"Saying"},{"zh":"我看到一座城市，人们在那里彼此相爱，却仍各自孤独。","en":"I see a city where people love one another and still stand alone.","byZh":"惠特曼《草叶集》意象","byEn":"After Walt Whitman","kindZh":"文学","kindEn":"Literature"},{"zh":"所有来不及的回答，都交给下一步电梯。","en":"Every unanswered question rides the next elevator.","byZh":"城签短句","byEn":"City Sign line","kindZh":"短句","kindEn":"Original line"}]},{"id":"losangeles","zh":"洛杉矶","en":"Los Angeles","countryZh":"美国","countryEn":"United States","continent":"北美洲","region":"北美","lat":34.0522,"lon":-118.2437,"climate":"地中海气候","popWan":382,"areaKm2":1300,"nickname":"天使之城","landmarks":["好莱坞","圣莫尼卡","格里菲斯天文台"],"tags":["电影","海滩","阳光"],"note":"","tz":"America/Los_Angeles","quote":null,"foods":{"zh":["墨西哥卷","汉堡","牛油果吐司"],"en":["Tacos","Burgers","Avocado Toast"]},"landmarksEn":["Hollywood Sign","Griffith Observatory","Santa Monica"],"tagline":null,"quoteEn":null,"continentEn":"North America","regionEn":"North America","climateEn":"Mediterranean climate","lines":[{"zh":"在洛杉矶，阳光是一种日用品。","en":"In Los Angeles, sunshine is a daily necessity.","byZh":"城市说法","byEn":"City saying","kindZh":"俗语","kindEn":"Saying"}]},{"id":"sanfrancisco","zh":"旧金山","en":"San Francisco","countryZh":"美国","countryEn":"United States","continent":"北美洲","region":"北美","lat":37.7749,"lon":-122.4194,"climate":"地中海气候","popWan":81,"areaKm2":121,"nickname":"金门之城","landmarks":["金门大桥","恶魔岛","九曲花街"],"tags":["科技","雾","缆车"],"note":"","tz":"America/Los_Angeles","quote":{"text":"我把心留在了旧金山。","author":"歌曲《I Left My Heart in San Francisco》"},"foods":{"zh":["酸面包","海鲜","墨西哥卷"],"en":["Sourdough","Seafood","Burrito"]},"landmarksEn":["Golden Gate Bridge","Alcatraz","Fisherman's Wharf"],"tagline":null,"quoteEn":{"text":"I left my heart in San Francisco.","author":"from the song I Left My Heart in San Francisco"},"continentEn":"North America","regionEn":"North America","climateEn":"Mediterranean climate","lines":[{"zh":"我把心留在了旧金山。","en":"I left my heart in San Francisco.","byZh":"歌曲《I Left My Heart in San Francisco》","byEn":"Song of the same name","kindZh":"俗语","kindEn":"Saying"},{"zh":"旧金山的雾，夏天比冬天更浓。","en":"San Francisco's fog is thicker in summer than winter.","byZh":"城市说法","byEn":"City saying","kindZh":"俗语","kindEn":"Saying"},{"zh":"我绝不宽恕不投票的人。","en":"I never forgive people who don't vote.","byZh":"马克·吐温（旧金山时期）","byEn":"Mark Twain","kindZh":"名言","kindEn":"Quote"}]},{"id":"chicago","zh":"芝加哥","en":"Chicago","countryZh":"美国","countryEn":"United States","continent":"北美洲","region":"北美","lat":41.8781,"lon":-87.6298,"climate":"湿润大陆性气候","popWan":266,"areaKm2":606,"nickname":"风城","landmarks":["千禧公园","威利斯大厦","密歇根大道"],"tags":["建筑","深盘披萨","爵士"],"note":"","tz":"America/Chicago","quote":null,"foods":{"zh":["深盘披萨","热狗","意大利牛肉"],"en":["Deep Dish Pizza","Hot Dogs","Italian Beef"]},"landmarksEn":["Millennium Park","Willis Tower","Riverwalk"],"tagline":null,"quoteEn":null,"continentEn":"North America","regionEn":"North America","climateEn":"Humid continental climate","lines":[{"zh":"芝加哥是美国的胃，也是美国的心。","en":"Chicago is America's stomach, and its heart.","byZh":"城市说法","byEn":"City saying","kindZh":"俗语","kindEn":"Saying"}]},{"id":"boston","zh":"波士顿","en":"Boston","countryZh":"美国","countryEn":"United States","continent":"北美洲","region":"北美","lat":42.3601,"lon":-71.0589,"climate":"湿润大陆性气候","popWan":65,"areaKm2":232,"nickname":"美国雅典","landmarks":["自由之路","哈佛","芬威球场"],"tags":["学府","龙虾","红叶"],"note":"","tz":"America/New_York","quote":null,"foods":{"zh":["龙虾卷","蛤蜊浓汤","甜甜圈"],"en":["Lobster Roll","Clam Chowder","Doughnut"]},"landmarksEn":["Freedom Trail","Fenway Park","Harbor"],"tagline":null,"quoteEn":null,"continentEn":"North America","regionEn":"North America","climateEn":"Humid continental climate","lines":[]},{"id":"washington","zh":"华盛顿","en":"Washington, D.C.","countryZh":"美国","countryEn":"United States","continent":"北美洲","region":"北美","lat":38.9072,"lon":-77.0369,"climate":"湿润副热带气候","popWan":68,"areaKm2":177,"nickname":"首善之都","landmarks":["白宫","国会大厦","林肯纪念堂"],"tags":["政治","博物馆","樱花"],"note":"","tz":"America/New_York","quote":null,"foods":{"zh":["蓝蟹","牛排","半烟熏"],"en":["Blue Crab","Steak","Half-smoke"]},"landmarksEn":["National Mall","Lincoln Memorial","Smithsonian"],"tagline":null,"quoteEn":null,"continentEn":"North America","regionEn":"North America","climateEn":"Humid subtropical climate","lines":[]},{"id":"seattle","zh":"西雅图","en":"Seattle","countryZh":"美国","countryEn":"United States","continent":"北美洲","region":"北美","lat":47.6062,"lon":-122.3321,"climate":"温带海洋性气候","popWan":76,"areaKm2":217,"nickname":"翡翠之城","landmarks":["太空针塔","派克市场","星巴克起源"],"tags":["咖啡","科技","雨"],"note":"","tz":"America/Los_Angeles","quote":null,"foods":{"zh":["三文鱼","咖啡","螃蟹"],"en":["Salmon","Coffee","Crab"]},"landmarksEn":["Space Needle","Pike Place Market","Mount Rainier"],"tagline":null,"quoteEn":null,"continentEn":"North America","regionEn":"North America","climateEn":"Temperate oceanic climate","lines":[]},{"id":"lasvegas","zh":"拉斯维加斯","en":"Las Vegas","countryZh":"美国","countryEn":"United States","continent":"北美洲","region":"北美","lat":36.1699,"lon":-115.1398,"climate":"热带沙漠气候","popWan":66,"areaKm2":352,"nickname":"世界娱乐之都","landmarks":["拉斯维加斯大道","百乐宫喷泉","老城"],"tags":["赌场","秀","沙漠"],"note":"","tz":"America/Los_Angeles","quote":null,"foods":{"zh":["牛排","自助餐","鸡尾酒"],"en":["Steak","Buffet","Cocktails"]},"landmarksEn":["The Strip","Bellagio Fountains","Red Rock Canyon"],"tagline":null,"quoteEn":null,"continentEn":"North America","regionEn":"North America","climateEn":"Hot desert climate","lines":[]},{"id":"miami","zh":"迈阿密","en":"Miami","countryZh":"美国","countryEn":"United States","continent":"北美洲","region":"北美","lat":25.7617,"lon":-80.1918,"climate":"热带季风气候","popWan":45,"areaKm2":143,"nickname":"拉美之窗","landmarks":["南海滩","小哈瓦那","温伍德"],"tags":["拉丁","ArtDeco","海滩"],"note":"","tz":"America/New_York","quote":null,"foods":{"zh":["古巴三明治","海鲜","酸橘汁腌鱼"],"en":["Cuban Sandwich","Seafood","Ceviche"]},"landmarksEn":["South Beach","Wynwood","Little Havana"],"tagline":null,"quoteEn":null,"continentEn":"North America","regionEn":"North America","climateEn":"Tropical monsoon climate","lines":[]},{"id":"honolulu","zh":"火奴鲁鲁","en":"Honolulu","countryZh":"美国","countryEn":"United States","continent":"北美洲","region":"北美","lat":21.3069,"lon":-157.8583,"climate":"热带草原气候","popWan":35,"areaKm2":177,"nickname":"太平洋明珠","landmarks":["威基基海滩","珍珠港","钻石头山"],"tags":["海岛","冲浪","彩虹"],"note":"檀香山；火奴鲁鲁县约 100 万","tz":"Pacific/Honolulu","quote":null,"foods":{"zh":["夏威夷拌饭","菠萝","烤猪"],"en":["Poke Bowl","Pineapple","Kalua Pig"]},"landmarksEn":["Waikiki Beach","Diamond Head","Pearl Harbor"],"tagline":null,"quoteEn":null,"continentEn":"North America","regionEn":"North America","climateEn":"Tropical savanna climate","lines":[]},{"id":"neworleans","zh":"新奥尔良","en":"New Orleans","countryZh":"美国","countryEn":"United States","continent":"北美洲","region":"北美","lat":29.9511,"lon":-90.0715,"climate":"湿润副热带气候","popWan":38,"areaKm2":906,"nickname":"爵士与狂欢之城","landmarks":["法国区","沼泽游船","有轨电车"],"tags":["爵士","狂欢节","卡津菜"],"note":"","tz":"America/Chicago","quote":null,"foods":{"zh":["秋葵汤","炸虾","贝奈特饼"],"en":["Gumbo","Fried Shrimp","Beignet"]},"landmarksEn":["French Quarter","Jackson Square","Garden District"],"tagline":null,"quoteEn":null,"continentEn":"North America","regionEn":"North America","climateEn":"Humid subtropical climate","lines":[]},{"id":"vancouver","zh":"温哥华","en":"Vancouver","countryZh":"加拿大","countryEn":"Canada","continent":"北美洲","region":"北美","lat":49.2827,"lon":-123.1207,"climate":"温带海洋性气候","popWan":66,"areaKm2":115,"nickname":"太平洋门户","landmarks":["斯坦利公园","卡皮拉诺吊桥","煤气镇"],"tags":["户外","海鲜","滑雪"],"note":"","tz":"America/Vancouver","quote":null,"foods":{"zh":["三文鱼","肉汁奶酪薯条","咖啡"],"en":["Salmon","Poutine","Coffee"]},"landmarksEn":["Stanley Park","Capilano Suspension Bridge","Granville Island"],"tagline":null,"quoteEn":null,"continentEn":"North America","regionEn":"North America","climateEn":"Temperate oceanic climate","lines":[]},{"id":"toronto","zh":"多伦多","en":"Toronto","countryZh":"加拿大","countryEn":"Canada","continent":"北美洲","region":"北美","lat":43.6532,"lon":-79.3832,"climate":"湿润大陆性气候","popWan":279,"areaKm2":630,"nickname":"枫叶之都","landmarks":["CN塔","安大略湖","皇家博物馆"],"tags":["多元","冰球","湖滨"],"note":"","tz":"America/Toronto","quote":null,"foods":{"zh":["肉汁奶酪薯条","披萨","唐人街点心"],"en":["Poutine","Pizza","Dim Sum"]},"landmarksEn":["CN Tower","Royal Ontario Museum","Niagara Falls (nearby)"],"tagline":null,"quoteEn":null,"continentEn":"North America","regionEn":"North America","climateEn":"Humid continental climate","lines":[]},{"id":"montreal","zh":"蒙特利尔","en":"Montreal","countryZh":"加拿大","countryEn":"Canada","continent":"北美洲","region":"北美","lat":45.5019,"lon":-73.5674,"climate":"湿润大陆性气候","popWan":176,"areaKm2":431,"nickname":"北美小巴黎","landmarks":["皇家山","老港","圣母圣殿"],"tags":["法式","艺术节","美食"],"note":"","tz":"America/Toronto","quote":null,"foods":{"zh":["熏肉三明治","肉汁奶酪薯条","百吉饼"],"en":["Smoked Meat Sandwich","Poutine","Bagel"]},"landmarksEn":["Notre-Dame Basilica","Mount Royal","Old Port"],"tagline":null,"quoteEn":null,"continentEn":"North America","regionEn":"North America","climateEn":"Humid continental climate","lines":[]},{"id":"mexicocity","zh":"墨西哥城","en":"Mexico City","countryZh":"墨西哥","countryEn":"Mexico","continent":"北美洲","region":"北美","lat":19.4326,"lon":-99.1332,"climate":"亚热带高原气候","popWan":921,"areaKm2":1485,"nickname":"宫殿之城","landmarks":["宪法广场","国家宫","特奥蒂瓦坎"],"tags":["壁画","塔可","古文明"],"note":"","tz":"America/Mexico_City","quote":null,"foods":{"zh":["塔可","玉米饼"," mole"],"en":["Tacos","Tortillas","Mole"]},"landmarksEn":["Zocalo","Teotihuacan (nearby)","Chapultepec"],"tagline":null,"quoteEn":null,"continentEn":"North America","regionEn":"North America","climateEn":"Subtropical plateau climate","lines":[{"zh":"墨西哥城是一座在古老废墟上生长的城市。","en":"Mexico City grows upon ancient ruins.","byZh":"城市说法","byEn":"City saying","kindZh":"俗语","kindEn":"Saying"}]},{"id":"havana","zh":"哈瓦那","en":"Havana","countryZh":"古巴","countryEn":"Cuba","continent":"北美洲","region":"北美","lat":23.1136,"lon":-82.3666,"climate":"热带草原气候","popWan":213,"areaKm2":728,"nickname":"加勒比珍珠","landmarks":["老广场","海滨大道","莫罗城堡"],"tags":["雪茄","老爷车","萨尔萨"],"note":"","tz":"America/Havana","quote":null,"foods":{"zh":["古巴三明治","朗姆酒","炸猪皮"],"en":["Cuban Sandwich","Rum","Chicharron"]},"landmarksEn":["Old Havana","Malecon","Classic Cars"],"tagline":null,"quoteEn":null,"continentEn":"North America","regionEn":"North America","climateEn":"Tropical savanna climate","lines":[{"zh":"哈瓦那，是加勒比海上一首未写完的诗。","en":"Havana is an unfinished poem on the Caribbean.","byZh":"城市说法","byEn":"City saying","kindZh":"俗语","kindEn":"Saying"}]},{"id":"rio","zh":"里约热内卢","en":"Rio de Janeiro","countryZh":"巴西","countryEn":"Brazil","continent":"南美洲","region":"南美","lat":-22.9068,"lon":-43.1729,"climate":"热带草原气候","popWan":674,"areaKm2":1200,"nickname":"奇妙之城","landmarks":["基督像","科帕卡巴纳","面包山"],"tags":["狂欢节","桑巴","海滩"],"note":"","tz":"America/Sao_Paulo","quote":null,"foods":{"zh":["巴西烤肉","巴西莓","椰奶鱼"],"en":["Churrasco","Acaí","Moqueca"]},"landmarksEn":["Christ the Redeemer","Copacabana","Sugarloaf Mountain"],"tagline":null,"quoteEn":null,"continentEn":"South America","regionEn":"South America","climateEn":"Tropical savanna climate","lines":[{"zh":"上帝用六天创造了世界，第七天创造了里约。","en":"God made the world in six days; on the seventh he made Rio.","byZh":"巴西谚语","byEn":"Brazilian saying","kindZh":"俗语","kindEn":"Saying"}]},{"id":"saopaulo","zh":"圣保罗","en":"São Paulo","countryZh":"巴西","countryEn":"Brazil","continent":"南美洲","region":"南美","lat":-23.5505,"lon":-46.6333,"climate":"湿润副热带气候","popWan":1145,"areaKm2":1521,"nickname":"南方的纽约","landmarks":["保利斯塔大街","伊比拉布埃拉公园","日本风情街"],"tags":["金融","美食","涂鸦"],"note":"","tz":"America/Sao_Paulo","quote":null,"foods":{"zh":["巴西烤肉","披萨","咖啡"],"en":["Churrasco","Pizza","Coffee"]},"landmarksEn":["Avenida Paulista","Ibirapuera Park","Sao Paulo Museum of Art"],"tagline":null,"quoteEn":null,"continentEn":"South America","regionEn":"South America","climateEn":"Humid subtropical climate","lines":[]},{"id":"buenosaires","zh":"布宜诺斯艾利斯","en":"Buenos Aires","countryZh":"阿根廷","countryEn":"Argentina","continent":"南美洲","region":"南美","lat":-34.6037,"lon":-58.3816,"climate":"湿润副热带气候","popWan":312,"areaKm2":203,"nickname":"南美巴黎","landmarks":["五月广场","博卡区","雷科莱塔"],"tags":["探戈","牛排","足球"],"note":"","tz":"America/Argentina/Buenos_Aires","quote":{"text":"我亲爱的布宜诺斯艾利斯。","author":"歌曲《Mi Buenos Aires querido》"},"foods":{"zh":["阿根廷烤肉","馅饼","马黛茶"],"en":["Asado","Empanadas","Yerba Mate"]},"landmarksEn":["Recoleta","La Boca","Obelisco"],"tagline":null,"quoteEn":{"text":"My dear Buenos Aires.","author":"from the song Mi Buenos Aires querido"},"continentEn":"South America","regionEn":"South America","climateEn":"Humid subtropical climate","lines":[{"zh":"我亲爱的布宜诺斯艾利斯。","en":"My dear Buenos Aires.","byZh":"探戈歌曲《Mi Buenos Aires querido》","byEn":"Tango song","kindZh":"俗语","kindEn":"Saying"},{"zh":"布宜诺斯艾利斯是南方的巴黎。","en":"Buenos Aires is the Paris of the South.","byZh":"城市说法","byEn":"City saying","kindZh":"俗语","kindEn":"Saying"},{"zh":"探戈是悲伤的思想，却跳成了舞步。","en":"Tango is a sad thought that is danced.","byZh":"多明戈·费德勒","byEn":"Domingo Federico","kindZh":"名言","kindEn":"Quote"}]},{"id":"lima","zh":"利马","en":"Lima","countryZh":"秘鲁","countryEn":"Peru","continent":"南美洲","region":"南美","lat":-12.0464,"lon":-77.0428,"climate":"热带沙漠气候","popWan":970,"areaKm2":2672,"nickname":"国王之城","landmarks":["武器广场","圣弗朗西斯科修道院","米拉弗洛雷斯"],"tags":["美食","沙漠","古文明"],"note":"利马省数据","tz":"America/Lima","quote":null,"foods":{"zh":["酸橘汁腌鱼","烤肉","玉米"],"en":["Ceviche","Anticuchos","Corn"]},"landmarksEn":["Historic Centre","Barranco","Markets"],"tagline":null,"quoteEn":null,"continentEn":"South America","regionEn":"South America","climateEn":"Hot desert climate","lines":[]},{"id":"bogota","zh":"波哥大","en":"Bogotá","countryZh":"哥伦比亚","countryEn":"Colombia","continent":"南美洲","region":"南美","lat":4.711,"lon":-74.0721,"climate":"亚热带高原气候","popWan":741,"areaKm2":1587,"nickname":"南美的雅典","landmarks":["黄金博物馆","蒙塞拉特山","拉坎德拉里亚"],"tags":["咖啡","涂鸦","山城"],"note":"","tz":"America/Bogota","quote":null,"foods":{"zh":["烤鸡","玉米饼","热巧克力"],"en":["Pollo Asado","Arepa","Aguapanela"]},"landmarksEn":["La Candelaria","Monserrate","Gold Museum"],"tagline":null,"quoteEn":null,"continentEn":"South America","regionEn":"South America","climateEn":"Subtropical plateau climate","lines":[]},{"id":"cairo","zh":"开罗","en":"Cairo","countryZh":"埃及","countryEn":"Egypt","continent":"非洲","region":"北非","lat":30.0444,"lon":31.2357,"climate":"热带沙漠气候","popWan":1010,"areaKm2":3085,"nickname":"千塔之城","landmarks":["吉萨金字塔","埃及博物馆","哈利利市场"],"tags":["法老","尼罗河","喧闹"],"note":"","tz":"Africa/Cairo","quote":{"text":"埃及是尼罗河的馈赠。","author":"希罗多德"},"foods":{"zh":["烤肉卷","鹰嘴豆泥","蚕豆"],"en":["Shawarma","Hummus","Ful Medames"]},"landmarksEn":["Giza Pyramids","Egyptian Museum","Khan al-Khalili"],"tagline":null,"quoteEn":{"text":"Egypt is the gift of the Nile.","author":"Herodotus"},"continentEn":"Africa","regionEn":"North Africa","climateEn":"Hot desert climate","lines":[{"zh":"埃及是尼罗河的馈赠。","en":"Egypt is the gift of the Nile.","byZh":"希罗多德","byEn":"Herodotus","kindZh":"名言","kindEn":"Quote"},{"zh":"谁饮过尼罗河水，就总会再想回来。","en":"Whoever drinks the Nile's water will long to return.","byZh":"埃及俗语","byEn":"Egyptian saying","kindZh":"俗语","kindEn":"Saying"},{"zh":"在开罗，时间不是被计算的，而是被商队的脚步丈量的。","en":"In Cairo, time is not counted but measured by the steps of caravans.","byZh":"城市印象","byEn":"City impression","kindZh":"城市逸闻","kindEn":"Local lore"}]},{"id":"marrakech","zh":"马拉喀什","en":"Marrakesh","countryZh":"摩洛哥","countryEn":"Morocco","continent":"非洲","region":"北非","lat":31.6295,"lon":-7.9811,"climate":"半干旱气候","popWan":93,"areaKm2":230,"nickname":"红色之城","landmarks":["杰马夫纳广场","库图比亚清真寺","马若雷勒花园"],"tags":["麦地那","薄荷茶","阿特拉斯"],"note":"","tz":"Africa/Casablanca","quote":null,"foods":{"zh":["塔吉锅","薄荷茶","库斯库斯"],"en":["Tajine","Mint Tea","Couscous"]},"landmarksEn":["Jemaa el-Fnaa","Majorelle Garden","Koutoubia Mosque"],"tagline":null,"quoteEn":null,"continentEn":"Africa","regionEn":"North Africa","climateEn":"Semi-arid climate","lines":[{"zh":"马拉喀什，是沙漠递给世界的一封红信。","en":"Marrakesh is a red letter the desert hands the world.","byZh":"城市说法","byEn":"City saying","kindZh":"俗语","kindEn":"Saying"}]},{"id":"capetown","zh":"开普敦","en":"Cape Town","countryZh":"南非","countryEn":"South Africa","continent":"非洲","region":"南部非洲","lat":-33.9249,"lon":18.4241,"climate":"地中海气候","popWan":460,"areaKm2":2445,"nickname":"上帝餐桌下的城","landmarks":["桌山","好望角","博卡普"],"tags":["桌山","企鹅","葡萄酒"],"note":"开普敦市都会区数据","tz":"Africa/Johannesburg","quote":null,"foods":{"zh":["南非烤肉","葡萄酒","咖喱"],"en":["Braai","Wine","Curry"]},"landmarksEn":["Table Mountain","Cape Point","Bo-Kaap"],"tagline":null,"quoteEn":null,"continentEn":"Africa","regionEn":"Southern Africa","climateEn":"Mediterranean climate","lines":[]},{"id":"johannesburg","zh":"约翰内斯堡","en":"Johannesburg","countryZh":"南非","countryEn":"South Africa","continent":"非洲","region":"南部非洲","lat":-26.2041,"lon":28.0473,"climate":"亚热带高原气候","popWan":570,"areaKm2":1645,"nickname":"黄金之城","landmarks":["种族隔离博物馆","曼德拉广场","索韦托"],"tags":["黄金","移民","创业"],"note":"","tz":"Africa/Johannesburg","quote":null,"foods":{"zh":["南非烤肉","玉米粥","牛肉干"],"en":["Braai","Pap","Biltong"]},"landmarksEn":["Apartheid Museum","Soweto","Cradle of Humankind"],"tagline":null,"quoteEn":null,"continentEn":"Africa","regionEn":"Southern Africa","climateEn":"Subtropical plateau climate","lines":[]},{"id":"nairobi","zh":"内罗毕","en":"Nairobi","countryZh":"肯尼亚","countryEn":"Kenya","continent":"非洲","region":"东非","lat":-1.2921,"lon":36.8219,"climate":"亚热带高原气候","popWan":440,"areaKm2":696,"nickname":"东非小伦敦","landmarks":["内罗毕国家公园","长颈鹿庄园","Karen Blixen 博物馆"],"tags":["野生动物","咖啡","创业"],"note":"","tz":"Africa/Nairobi","quote":null,"foods":{"zh":["烤羊排","玉米","乌伽黎"],"en":["Nyama Choma","Corn","Ugali"]},"landmarksEn":["Nairobi National Park","Giraffe Centre","Maasai Market"],"tagline":null,"quoteEn":null,"continentEn":"Africa","regionEn":"East Africa","climateEn":"Subtropical plateau climate","lines":[]},{"id":"addisababa","zh":"亚的斯亚贝巴","en":"Addis Ababa","countryZh":"埃塞俄比亚","countryEn":"Ethiopia","continent":"非洲","region":"东非","lat":9.03,"lon":38.74,"climate":"亚热带高原气候","popWan":546,"areaKm2":527,"nickname":"非洲的外交之都","landmarks":["非盟总部","圣三一大教堂","恩托托山"],"tags":["咖啡起源","非盟","高原"],"note":"","tz":"Africa/Addis_Ababa","quote":null,"foods":{"zh":["英吉拉","咖啡","炖肉"],"en":["Injera","Coffee","Wat"]},"landmarksEn":["National Museum","Entoto Hills","Merhazed"],"tagline":null,"quoteEn":null,"continentEn":"Africa","regionEn":"East Africa","climateEn":"Subtropical plateau climate","lines":[]},{"id":"sydney","zh":"悉尼","en":"Sydney","countryZh":"澳大利亚","countryEn":"Australia","continent":"大洋洲","region":"大洋洲","lat":-33.8688,"lon":151.2093,"climate":"湿润副热带气候","popWan":523,"areaKm2":12368,"nickname":"海港之城","landmarks":["歌剧院","海港大桥","邦迪海滩"],"tags":["海港","冲浪","跨年烟火"],"note":"大悉尼都会区数据","tz":"Australia/Sydney","quote":null,"foods":{"zh":["肉派","海鲜","咖啡"],"en":["Meat Pie","Seafood","Coffee"]},"landmarksEn":["Opera House","Harbour Bridge","Bondi Beach"],"tagline":{"zh":"海港把城市折成两半，一半是生活，一半是光。","en":"The harbour folds the city: half life, half light."},"quoteEn":null,"continentEn":"Oceania","regionEn":"Oceania","climateEn":"Humid subtropical climate","lines":[{"zh":"悉尼歌剧院是海上的白帆。","en":"The Sydney Opera House is a white sail upon the sea.","byZh":"城市说法","byEn":"City saying","kindZh":"俗语","kindEn":"Saying"},{"zh":"阳光是这座城市的通用货币。","en":"Sunshine is this city's common currency.","byZh":"城市印象","byEn":"City impression","kindZh":"城市逸闻","kindEn":"Local lore"},{"zh":"海港把城市折成两半，一半是生活，一半是光。","en":"The harbour folds the city: half life, half light.","byZh":"城签短句","byEn":"City Sign line","kindZh":"短句","kindEn":"Original line"}]},{"id":"melbourne","zh":"墨尔本","en":"Melbourne","countryZh":"澳大利亚","countryEn":"Australia","continent":"大洋洲","region":"大洋洲","lat":-37.8136,"lon":144.9631,"climate":"温带海洋性气候","popWan":492,"areaKm2":9993,"nickname":"咖啡与艺术之都","landmarks":["联邦广场","涂鸦巷","大洋路"],"tags":["咖啡","艺术","板球"],"note":"大墨尔本都会区数据","tz":"Australia/Sydney","quote":null,"foods":{"zh":["咖啡","肉派","意面"],"en":["Coffee","Meat Pie","Pasta"]},"landmarksEn":["Federation Square","Queen Victoria Market","Great Ocean Road"],"tagline":null,"quoteEn":null,"continentEn":"Oceania","regionEn":"Oceania","climateEn":"Temperate oceanic climate","lines":[]},{"id":"perth","zh":"珀斯","en":"Perth","countryZh":"澳大利亚","countryEn":"Australia","continent":"大洋洲","region":"大洋洲","lat":-31.9523,"lon":115.8613,"climate":"地中海气候","popWan":212,"areaKm2":6418,"nickname":"世界上最孤独的城市","landmarks":["国王公园","弗里曼特尔","天鹅河"],"tags":["孤独","阳光","红酒"],"note":"大珀斯都会区数据","tz":"Australia/Perth","quote":null,"foods":{"zh":["海鲜","牛排","咖啡"],"en":["Seafood","Steak","Coffee"]},"landmarksEn":["Kings Park","Elizabeth Quay","Rottnest Island"],"tagline":null,"quoteEn":null,"continentEn":"Oceania","regionEn":"Oceania","climateEn":"Mediterranean climate","lines":[]},{"id":"auckland","zh":"奥克兰","en":"Auckland","countryZh":"新西兰","countryEn":"New Zealand","continent":"大洋洲","region":"大洋洲","lat":-36.8485,"lon":174.7633,"climate":"温带海洋性气候","popWan":172,"areaKm2":4894,"nickname":"风帆之都","landmarks":["天空塔","怀赫科岛","伊甸山"],"tags":["帆船","火山","毛利"],"note":"奥克兰大区数据","tz":"Pacific/Auckland","quote":null,"foods":{"zh":["炸鱼薯条","奶油甜点","海鲜"],"en":["Fish and Chips","Pavlova","Seafood"]},"landmarksEn":["Sky Tower","Mission Bay","Waiheke Island"],"tagline":null,"quoteEn":null,"continentEn":"Oceania","regionEn":"Oceania","climateEn":"Temperate oceanic climate","lines":[{"zh":"奥克兰，是挂在南十字星下的一座城。","en":"Auckland is a city hung beneath the Southern Cross.","byZh":"城市说法","byEn":"City saying","kindZh":"俗语","kindEn":"Saying"}]},{"id":"queenstown","zh":"皇后镇","en":"Queenstown","countryZh":"新西兰","countryEn":"New Zealand","continent":"大洋洲","region":"大洋洲","lat":-45.0312,"lon":168.6626,"climate":"温带海洋性气候","popWan":2,"areaKm2":25,"nickname":"冒险之都","landmarks":["瓦卡蒂普湖","卓越峰","天空缆车"],"tags":["蹦极","雪山","湖泊"],"note":"镇区人口","tz":"Pacific/Auckland","quote":null,"foods":{"zh":["羊肉","葡萄酒","三文鱼"],"en":["Lamb","Wine","Salmon"]},"landmarksEn":["Lake Wakatipu","The Remarkables","Milford Sound"],"tagline":null,"quoteEn":null,"continentEn":"Oceania","regionEn":"Oceania","climateEn":"Temperate oceanic climate","lines":[]}]};
+window.MAP_DATA = {"w":360.0,"h":144.0,"top":84.0,"bot":-60.0,"dots":"M92.8 0.8h2.4v2.4h-2.4zM96.8 0.8h2.4v2.4h-2.4zM120.8 0.8h2.4v2.4h-2.4zM124.8 0.8h2.4v2.4h-2.4zM128.8 0.8h2.4v2.4h-2.4zM132.8 0.8h2.4v2.4h-2.4zM136.8 0.8h2.4v2.4h-2.4zM140.8 0.8h2.4v2.4h-2.4zM144.8 0.8h2.4v2.4h-2.4zM272.8 0.8h2.4v2.4h-2.4zM276.8 0.8h2.4v2.4h-2.4zM92.8 4.8h2.4v2.4h-2.4zM96.8 4.8h2.4v2.4h-2.4zM116.8 4.8h2.4v2.4h-2.4zM120.8 4.8h2.4v2.4h-2.4zM124.8 4.8h2.4v2.4h-2.4zM128.8 4.8h2.4v2.4h-2.4zM132.8 4.8h2.4v2.4h-2.4zM136.8 4.8h2.4v2.4h-2.4zM140.8 4.8h2.4v2.4h-2.4zM144.8 4.8h2.4v2.4h-2.4zM148.8 4.8h2.4v2.4h-2.4zM152.8 4.8h2.4v2.4h-2.4zM192.8 4.8h2.4v2.4h-2.4zM196.8 4.8h2.4v2.4h-2.4zM64.8 8.8h2.4v2.4h-2.4zM68.8 8.8h2.4v2.4h-2.4zM96.8 8.8h2.4v2.4h-2.4zM100.8 8.8h2.4v2.4h-2.4zM104.8 8.8h2.4v2.4h-2.4zM120.8 8.8h2.4v2.4h-2.4zM124.8 8.8h2.4v2.4h-2.4zM128.8 8.8h2.4v2.4h-2.4zM132.8 8.8h2.4v2.4h-2.4zM136.8 8.8h2.4v2.4h-2.4zM140.8 8.8h2.4v2.4h-2.4zM144.8 8.8h2.4v2.4h-2.4zM148.8 8.8h2.4v2.4h-2.4zM152.8 8.8h2.4v2.4h-2.4zM232.8 8.8h2.4v2.4h-2.4zM236.8 8.8h2.4v2.4h-2.4zM264.8 8.8h2.4v2.4h-2.4zM268.8 8.8h2.4v2.4h-2.4zM272.8 8.8h2.4v2.4h-2.4zM276.8 8.8h2.4v2.4h-2.4zM280.8 8.8h2.4v2.4h-2.4zM284.8 8.8h2.4v2.4h-2.4zM288.8 8.8h2.4v2.4h-2.4zM16.8 12.8h2.4v2.4h-2.4zM20.8 12.8h2.4v2.4h-2.4zM24.8 12.8h2.4v2.4h-2.4zM28.8 12.8h2.4v2.4h-2.4zM32.8 12.8h2.4v2.4h-2.4zM36.8 12.8h2.4v2.4h-2.4zM64.8 12.8h2.4v2.4h-2.4zM68.8 12.8h2.4v2.4h-2.4zM80.8 12.8h2.4v2.4h-2.4zM84.8 12.8h2.4v2.4h-2.4zM88.8 12.8h2.4v2.4h-2.4zM92.8 12.8h2.4v2.4h-2.4zM96.8 12.8h2.4v2.4h-2.4zM100.8 12.8h2.4v2.4h-2.4zM104.8 12.8h2.4v2.4h-2.4zM108.8 12.8h2.4v2.4h-2.4zM124.8 12.8h2.4v2.4h-2.4zM128.8 12.8h2.4v2.4h-2.4zM132.8 12.8h2.4v2.4h-2.4zM136.8 12.8h2.4v2.4h-2.4zM140.8 12.8h2.4v2.4h-2.4zM144.8 12.8h2.4v2.4h-2.4zM148.8 12.8h2.4v2.4h-2.4zM152.8 12.8h2.4v2.4h-2.4zM236.8 12.8h2.4v2.4h-2.4zM240.8 12.8h2.4v2.4h-2.4zM244.8 12.8h2.4v2.4h-2.4zM248.8 12.8h2.4v2.4h-2.4zM252.8 12.8h2.4v2.4h-2.4zM256.8 12.8h2.4v2.4h-2.4zM260.8 12.8h2.4v2.4h-2.4zM264.8 12.8h2.4v2.4h-2.4zM268.8 12.8h2.4v2.4h-2.4zM272.8 12.8h2.4v2.4h-2.4zM276.8 12.8h2.4v2.4h-2.4zM280.8 12.8h2.4v2.4h-2.4zM284.8 12.8h2.4v2.4h-2.4zM288.8 12.8h2.4v2.4h-2.4zM292.8 12.8h2.4v2.4h-2.4zM296.8 12.8h2.4v2.4h-2.4zM300.8 12.8h2.4v2.4h-2.4zM304.8 12.8h2.4v2.4h-2.4zM308.8 12.8h2.4v2.4h-2.4zM312.8 12.8h2.4v2.4h-2.4zM316.8 12.8h2.4v2.4h-2.4zM320.8 12.8h2.4v2.4h-2.4zM324.8 12.8h2.4v2.4h-2.4zM12.8 16.8h2.4v2.4h-2.4zM16.8 16.8h2.4v2.4h-2.4zM20.8 16.8h2.4v2.4h-2.4zM24.8 16.8h2.4v2.4h-2.4zM28.8 16.8h2.4v2.4h-2.4zM32.8 16.8h2.4v2.4h-2.4zM36.8 16.8h2.4v2.4h-2.4zM40.8 16.8h2.4v2.4h-2.4zM44.8 16.8h2.4v2.4h-2.4zM48.8 16.8h2.4v2.4h-2.4zM52.8 16.8h2.4v2.4h-2.4zM56.8 16.8h2.4v2.4h-2.4zM60.8 16.8h2.4v2.4h-2.4zM64.8 16.8h2.4v2.4h-2.4zM68.8 16.8h2.4v2.4h-2.4zM72.8 16.8h2.4v2.4h-2.4zM76.8 16.8h2.4v2.4h-2.4zM80.8 16.8h2.4v2.4h-2.4zM84.8 16.8h2.4v2.4h-2.4zM88.8 16.8h2.4v2.4h-2.4zM92.8 16.8h2.4v2.4h-2.4zM96.8 16.8h2.4v2.4h-2.4zM100.8 16.8h2.4v2.4h-2.4zM104.8 16.8h2.4v2.4h-2.4zM108.8 16.8h2.4v2.4h-2.4zM112.8 16.8h2.4v2.4h-2.4zM128.8 16.8h2.4v2.4h-2.4zM132.8 16.8h2.4v2.4h-2.4zM136.8 16.8h2.4v2.4h-2.4zM140.8 16.8h2.4v2.4h-2.4zM144.8 16.8h2.4v2.4h-2.4zM160.8 16.8h2.4v2.4h-2.4zM208.8 16.8h2.4v2.4h-2.4zM212.8 16.8h2.4v2.4h-2.4zM216.8 16.8h2.4v2.4h-2.4zM220.8 16.8h2.4v2.4h-2.4zM224.8 16.8h2.4v2.4h-2.4zM228.8 16.8h2.4v2.4h-2.4zM232.8 16.8h2.4v2.4h-2.4zM236.8 16.8h2.4v2.4h-2.4zM240.8 16.8h2.4v2.4h-2.4zM244.8 16.8h2.4v2.4h-2.4zM248.8 16.8h2.4v2.4h-2.4zM252.8 16.8h2.4v2.4h-2.4zM256.8 16.8h2.4v2.4h-2.4zM260.8 16.8h2.4v2.4h-2.4zM264.8 16.8h2.4v2.4h-2.4zM268.8 16.8h2.4v2.4h-2.4zM272.8 16.8h2.4v2.4h-2.4zM276.8 16.8h2.4v2.4h-2.4zM280.8 16.8h2.4v2.4h-2.4zM284.8 16.8h2.4v2.4h-2.4zM288.8 16.8h2.4v2.4h-2.4zM292.8 16.8h2.4v2.4h-2.4zM296.8 16.8h2.4v2.4h-2.4zM300.8 16.8h2.4v2.4h-2.4zM304.8 16.8h2.4v2.4h-2.4zM308.8 16.8h2.4v2.4h-2.4zM312.8 16.8h2.4v2.4h-2.4zM316.8 16.8h2.4v2.4h-2.4zM320.8 16.8h2.4v2.4h-2.4zM324.8 16.8h2.4v2.4h-2.4zM328.8 16.8h2.4v2.4h-2.4zM332.8 16.8h2.4v2.4h-2.4zM12.8 20.8h2.4v2.4h-2.4zM16.8 20.8h2.4v2.4h-2.4zM20.8 20.8h2.4v2.4h-2.4zM24.8 20.8h2.4v2.4h-2.4zM28.8 20.8h2.4v2.4h-2.4zM32.8 20.8h2.4v2.4h-2.4zM36.8 20.8h2.4v2.4h-2.4zM40.8 20.8h2.4v2.4h-2.4zM44.8 20.8h2.4v2.4h-2.4zM48.8 20.8h2.4v2.4h-2.4zM52.8 20.8h2.4v2.4h-2.4zM56.8 20.8h2.4v2.4h-2.4zM60.8 20.8h2.4v2.4h-2.4zM64.8 20.8h2.4v2.4h-2.4zM68.8 20.8h2.4v2.4h-2.4zM72.8 20.8h2.4v2.4h-2.4zM76.8 20.8h2.4v2.4h-2.4zM80.8 20.8h2.4v2.4h-2.4zM84.8 20.8h2.4v2.4h-2.4zM88.8 20.8h2.4v2.4h-2.4zM92.8 20.8h2.4v2.4h-2.4zM96.8 20.8h2.4v2.4h-2.4zM100.8 20.8h2.4v2.4h-2.4zM104.8 20.8h2.4v2.4h-2.4zM108.8 20.8h2.4v2.4h-2.4zM112.8 20.8h2.4v2.4h-2.4zM116.8 20.8h2.4v2.4h-2.4zM132.8 20.8h2.4v2.4h-2.4zM136.8 20.8h2.4v2.4h-2.4zM208.8 20.8h2.4v2.4h-2.4zM212.8 20.8h2.4v2.4h-2.4zM216.8 20.8h2.4v2.4h-2.4zM220.8 20.8h2.4v2.4h-2.4zM224.8 20.8h2.4v2.4h-2.4zM228.8 20.8h2.4v2.4h-2.4zM232.8 20.8h2.4v2.4h-2.4zM236.8 20.8h2.4v2.4h-2.4zM240.8 20.8h2.4v2.4h-2.4zM244.8 20.8h2.4v2.4h-2.4zM248.8 20.8h2.4v2.4h-2.4zM252.8 20.8h2.4v2.4h-2.4zM256.8 20.8h2.4v2.4h-2.4zM260.8 20.8h2.4v2.4h-2.4zM264.8 20.8h2.4v2.4h-2.4zM268.8 20.8h2.4v2.4h-2.4zM272.8 20.8h2.4v2.4h-2.4zM276.8 20.8h2.4v2.4h-2.4zM280.8 20.8h2.4v2.4h-2.4zM284.8 20.8h2.4v2.4h-2.4zM288.8 20.8h2.4v2.4h-2.4zM292.8 20.8h2.4v2.4h-2.4zM296.8 20.8h2.4v2.4h-2.4zM300.8 20.8h2.4v2.4h-2.4zM304.8 20.8h2.4v2.4h-2.4zM308.8 20.8h2.4v2.4h-2.4zM312.8 20.8h2.4v2.4h-2.4zM316.8 20.8h2.4v2.4h-2.4zM320.8 20.8h2.4v2.4h-2.4zM324.8 20.8h2.4v2.4h-2.4zM328.8 20.8h2.4v2.4h-2.4zM332.8 20.8h2.4v2.4h-2.4zM336.8 20.8h2.4v2.4h-2.4zM340.8 20.8h2.4v2.4h-2.4zM344.8 20.8h2.4v2.4h-2.4zM348.8 20.8h2.4v2.4h-2.4zM352.8 20.8h2.4v2.4h-2.4zM356.8 20.8h2.4v2.4h-2.4zM16.8 24.8h2.4v2.4h-2.4zM20.8 24.8h2.4v2.4h-2.4zM24.8 24.8h2.4v2.4h-2.4zM44.8 24.8h2.4v2.4h-2.4zM48.8 24.8h2.4v2.4h-2.4zM52.8 24.8h2.4v2.4h-2.4zM56.8 24.8h2.4v2.4h-2.4zM60.8 24.8h2.4v2.4h-2.4zM64.8 24.8h2.4v2.4h-2.4zM68.8 24.8h2.4v2.4h-2.4zM72.8 24.8h2.4v2.4h-2.4zM76.8 24.8h2.4v2.4h-2.4zM80.8 24.8h2.4v2.4h-2.4zM84.8 24.8h2.4v2.4h-2.4zM88.8 24.8h2.4v2.4h-2.4zM92.8 24.8h2.4v2.4h-2.4zM96.8 24.8h2.4v2.4h-2.4zM100.8 24.8h2.4v2.4h-2.4zM104.8 24.8h2.4v2.4h-2.4zM108.8 24.8h2.4v2.4h-2.4zM112.8 24.8h2.4v2.4h-2.4zM116.8 24.8h2.4v2.4h-2.4zM204.8 24.8h2.4v2.4h-2.4zM208.8 24.8h2.4v2.4h-2.4zM212.8 24.8h2.4v2.4h-2.4zM216.8 24.8h2.4v2.4h-2.4zM220.8 24.8h2.4v2.4h-2.4zM224.8 24.8h2.4v2.4h-2.4zM228.8 24.8h2.4v2.4h-2.4zM232.8 24.8h2.4v2.4h-2.4zM236.8 24.8h2.4v2.4h-2.4zM240.8 24.8h2.4v2.4h-2.4zM244.8 24.8h2.4v2.4h-2.4zM248.8 24.8h2.4v2.4h-2.4zM252.8 24.8h2.4v2.4h-2.4zM256.8 24.8h2.4v2.4h-2.4zM260.8 24.8h2.4v2.4h-2.4zM264.8 24.8h2.4v2.4h-2.4zM268.8 24.8h2.4v2.4h-2.4zM272.8 24.8h2.4v2.4h-2.4zM276.8 24.8h2.4v2.4h-2.4zM280.8 24.8h2.4v2.4h-2.4zM284.8 24.8h2.4v2.4h-2.4zM288.8 24.8h2.4v2.4h-2.4zM292.8 24.8h2.4v2.4h-2.4zM296.8 24.8h2.4v2.4h-2.4zM300.8 24.8h2.4v2.4h-2.4zM304.8 24.8h2.4v2.4h-2.4zM308.8 24.8h2.4v2.4h-2.4zM312.8 24.8h2.4v2.4h-2.4zM316.8 24.8h2.4v2.4h-2.4zM320.8 24.8h2.4v2.4h-2.4zM324.8 24.8h2.4v2.4h-2.4zM328.8 24.8h2.4v2.4h-2.4zM332.8 24.8h2.4v2.4h-2.4zM336.8 24.8h2.4v2.4h-2.4zM340.8 24.8h2.4v2.4h-2.4zM48.8 28.8h2.4v2.4h-2.4zM52.8 28.8h2.4v2.4h-2.4zM56.8 28.8h2.4v2.4h-2.4zM60.8 28.8h2.4v2.4h-2.4zM64.8 28.8h2.4v2.4h-2.4zM68.8 28.8h2.4v2.4h-2.4zM72.8 28.8h2.4v2.4h-2.4zM76.8 28.8h2.4v2.4h-2.4zM80.8 28.8h2.4v2.4h-2.4zM84.8 28.8h2.4v2.4h-2.4zM88.8 28.8h2.4v2.4h-2.4zM92.8 28.8h2.4v2.4h-2.4zM96.8 28.8h2.4v2.4h-2.4zM100.8 28.8h2.4v2.4h-2.4zM104.8 28.8h2.4v2.4h-2.4zM108.8 28.8h2.4v2.4h-2.4zM112.8 28.8h2.4v2.4h-2.4zM116.8 28.8h2.4v2.4h-2.4zM120.8 28.8h2.4v2.4h-2.4zM168.8 28.8h2.4v2.4h-2.4zM176.8 28.8h2.4v2.4h-2.4zM188.8 28.8h2.4v2.4h-2.4zM192.8 28.8h2.4v2.4h-2.4zM196.8 28.8h2.4v2.4h-2.4zM200.8 28.8h2.4v2.4h-2.4zM204.8 28.8h2.4v2.4h-2.4zM208.8 28.8h2.4v2.4h-2.4zM212.8 28.8h2.4v2.4h-2.4zM216.8 28.8h2.4v2.4h-2.4zM220.8 28.8h2.4v2.4h-2.4zM224.8 28.8h2.4v2.4h-2.4zM228.8 28.8h2.4v2.4h-2.4zM232.8 28.8h2.4v2.4h-2.4zM236.8 28.8h2.4v2.4h-2.4zM240.8 28.8h2.4v2.4h-2.4zM244.8 28.8h2.4v2.4h-2.4zM248.8 28.8h2.4v2.4h-2.4zM252.8 28.8h2.4v2.4h-2.4zM256.8 28.8h2.4v2.4h-2.4zM260.8 28.8h2.4v2.4h-2.4zM264.8 28.8h2.4v2.4h-2.4zM268.8 28.8h2.4v2.4h-2.4zM272.8 28.8h2.4v2.4h-2.4zM276.8 28.8h2.4v2.4h-2.4zM280.8 28.8h2.4v2.4h-2.4zM284.8 28.8h2.4v2.4h-2.4zM288.8 28.8h2.4v2.4h-2.4zM292.8 28.8h2.4v2.4h-2.4zM296.8 28.8h2.4v2.4h-2.4zM300.8 28.8h2.4v2.4h-2.4zM304.8 28.8h2.4v2.4h-2.4zM308.8 28.8h2.4v2.4h-2.4zM312.8 28.8h2.4v2.4h-2.4zM316.8 28.8h2.4v2.4h-2.4zM320.8 28.8h2.4v2.4h-2.4zM324.8 28.8h2.4v2.4h-2.4zM328.8 28.8h2.4v2.4h-2.4zM332.8 28.8h2.4v2.4h-2.4zM52.8 32.8h2.4v2.4h-2.4zM56.8 32.8h2.4v2.4h-2.4zM60.8 32.8h2.4v2.4h-2.4zM64.8 32.8h2.4v2.4h-2.4zM68.8 32.8h2.4v2.4h-2.4zM72.8 32.8h2.4v2.4h-2.4zM76.8 32.8h2.4v2.4h-2.4zM80.8 32.8h2.4v2.4h-2.4zM84.8 32.8h2.4v2.4h-2.4zM88.8 32.8h2.4v2.4h-2.4zM92.8 32.8h2.4v2.4h-2.4zM96.8 32.8h2.4v2.4h-2.4zM100.8 32.8h2.4v2.4h-2.4zM104.8 32.8h2.4v2.4h-2.4zM108.8 32.8h2.4v2.4h-2.4zM112.8 32.8h2.4v2.4h-2.4zM116.8 32.8h2.4v2.4h-2.4zM124.8 32.8h2.4v2.4h-2.4zM180.8 32.8h2.4v2.4h-2.4zM184.8 32.8h2.4v2.4h-2.4zM188.8 32.8h2.4v2.4h-2.4zM192.8 32.8h2.4v2.4h-2.4zM196.8 32.8h2.4v2.4h-2.4zM200.8 32.8h2.4v2.4h-2.4zM204.8 32.8h2.4v2.4h-2.4zM208.8 32.8h2.4v2.4h-2.4zM212.8 32.8h2.4v2.4h-2.4zM216.8 32.8h2.4v2.4h-2.4zM220.8 32.8h2.4v2.4h-2.4zM224.8 32.8h2.4v2.4h-2.4zM228.8 32.8h2.4v2.4h-2.4zM232.8 32.8h2.4v2.4h-2.4zM236.8 32.8h2.4v2.4h-2.4zM240.8 32.8h2.4v2.4h-2.4zM244.8 32.8h2.4v2.4h-2.4zM248.8 32.8h2.4v2.4h-2.4zM252.8 32.8h2.4v2.4h-2.4zM256.8 32.8h2.4v2.4h-2.4zM260.8 32.8h2.4v2.4h-2.4zM264.8 32.8h2.4v2.4h-2.4zM268.8 32.8h2.4v2.4h-2.4zM272.8 32.8h2.4v2.4h-2.4zM276.8 32.8h2.4v2.4h-2.4zM280.8 32.8h2.4v2.4h-2.4zM284.8 32.8h2.4v2.4h-2.4zM288.8 32.8h2.4v2.4h-2.4zM292.8 32.8h2.4v2.4h-2.4zM296.8 32.8h2.4v2.4h-2.4zM300.8 32.8h2.4v2.4h-2.4zM304.8 32.8h2.4v2.4h-2.4zM308.8 32.8h2.4v2.4h-2.4zM312.8 32.8h2.4v2.4h-2.4zM316.8 32.8h2.4v2.4h-2.4zM320.8 32.8h2.4v2.4h-2.4zM324.8 32.8h2.4v2.4h-2.4zM56.8 36.8h2.4v2.4h-2.4zM60.8 36.8h2.4v2.4h-2.4zM64.8 36.8h2.4v2.4h-2.4zM68.8 36.8h2.4v2.4h-2.4zM72.8 36.8h2.4v2.4h-2.4zM76.8 36.8h2.4v2.4h-2.4zM80.8 36.8h2.4v2.4h-2.4zM84.8 36.8h2.4v2.4h-2.4zM88.8 36.8h2.4v2.4h-2.4zM92.8 36.8h2.4v2.4h-2.4zM96.8 36.8h2.4v2.4h-2.4zM100.8 36.8h2.4v2.4h-2.4zM104.8 36.8h2.4v2.4h-2.4zM108.8 36.8h2.4v2.4h-2.4zM112.8 36.8h2.4v2.4h-2.4zM176.8 36.8h2.4v2.4h-2.4zM180.8 36.8h2.4v2.4h-2.4zM184.8 36.8h2.4v2.4h-2.4zM188.8 36.8h2.4v2.4h-2.4zM192.8 36.8h2.4v2.4h-2.4zM196.8 36.8h2.4v2.4h-2.4zM200.8 36.8h2.4v2.4h-2.4zM204.8 36.8h2.4v2.4h-2.4zM208.8 36.8h2.4v2.4h-2.4zM220.8 36.8h2.4v2.4h-2.4zM224.8 36.8h2.4v2.4h-2.4zM228.8 36.8h2.4v2.4h-2.4zM232.8 36.8h2.4v2.4h-2.4zM236.8 36.8h2.4v2.4h-2.4zM240.8 36.8h2.4v2.4h-2.4zM244.8 36.8h2.4v2.4h-2.4zM248.8 36.8h2.4v2.4h-2.4zM252.8 36.8h2.4v2.4h-2.4zM256.8 36.8h2.4v2.4h-2.4zM260.8 36.8h2.4v2.4h-2.4zM264.8 36.8h2.4v2.4h-2.4zM268.8 36.8h2.4v2.4h-2.4zM272.8 36.8h2.4v2.4h-2.4zM276.8 36.8h2.4v2.4h-2.4zM280.8 36.8h2.4v2.4h-2.4zM284.8 36.8h2.4v2.4h-2.4zM288.8 36.8h2.4v2.4h-2.4zM292.8 36.8h2.4v2.4h-2.4zM296.8 36.8h2.4v2.4h-2.4zM300.8 36.8h2.4v2.4h-2.4zM304.8 36.8h2.4v2.4h-2.4zM308.8 36.8h2.4v2.4h-2.4zM312.8 36.8h2.4v2.4h-2.4zM316.8 36.8h2.4v2.4h-2.4zM56.8 40.8h2.4v2.4h-2.4zM60.8 40.8h2.4v2.4h-2.4zM64.8 40.8h2.4v2.4h-2.4zM68.8 40.8h2.4v2.4h-2.4zM72.8 40.8h2.4v2.4h-2.4zM76.8 40.8h2.4v2.4h-2.4zM80.8 40.8h2.4v2.4h-2.4zM84.8 40.8h2.4v2.4h-2.4zM88.8 40.8h2.4v2.4h-2.4zM92.8 40.8h2.4v2.4h-2.4zM96.8 40.8h2.4v2.4h-2.4zM100.8 40.8h2.4v2.4h-2.4zM104.8 40.8h2.4v2.4h-2.4zM172.8 40.8h2.4v2.4h-2.4zM176.8 40.8h2.4v2.4h-2.4zM188.8 40.8h2.4v2.4h-2.4zM196.8 40.8h2.4v2.4h-2.4zM200.8 40.8h2.4v2.4h-2.4zM204.8 40.8h2.4v2.4h-2.4zM216.8 40.8h2.4v2.4h-2.4zM220.8 40.8h2.4v2.4h-2.4zM224.8 40.8h2.4v2.4h-2.4zM228.8 40.8h2.4v2.4h-2.4zM232.8 40.8h2.4v2.4h-2.4zM236.8 40.8h2.4v2.4h-2.4zM240.8 40.8h2.4v2.4h-2.4zM244.8 40.8h2.4v2.4h-2.4zM248.8 40.8h2.4v2.4h-2.4zM252.8 40.8h2.4v2.4h-2.4zM256.8 40.8h2.4v2.4h-2.4zM260.8 40.8h2.4v2.4h-2.4zM264.8 40.8h2.4v2.4h-2.4zM268.8 40.8h2.4v2.4h-2.4zM272.8 40.8h2.4v2.4h-2.4zM276.8 40.8h2.4v2.4h-2.4zM280.8 40.8h2.4v2.4h-2.4zM284.8 40.8h2.4v2.4h-2.4zM288.8 40.8h2.4v2.4h-2.4zM292.8 40.8h2.4v2.4h-2.4zM296.8 40.8h2.4v2.4h-2.4zM300.8 40.8h2.4v2.4h-2.4zM304.8 40.8h2.4v2.4h-2.4zM320.8 40.8h2.4v2.4h-2.4zM56.8 44.8h2.4v2.4h-2.4zM60.8 44.8h2.4v2.4h-2.4zM64.8 44.8h2.4v2.4h-2.4zM68.8 44.8h2.4v2.4h-2.4zM72.8 44.8h2.4v2.4h-2.4zM76.8 44.8h2.4v2.4h-2.4zM80.8 44.8h2.4v2.4h-2.4zM84.8 44.8h2.4v2.4h-2.4zM88.8 44.8h2.4v2.4h-2.4zM92.8 44.8h2.4v2.4h-2.4zM96.8 44.8h2.4v2.4h-2.4zM100.8 44.8h2.4v2.4h-2.4zM104.8 44.8h2.4v2.4h-2.4zM152.8 44.8h2.4v2.4h-2.4zM172.8 44.8h2.4v2.4h-2.4zM176.8 44.8h2.4v2.4h-2.4zM192.8 44.8h2.4v2.4h-2.4zM200.8 44.8h2.4v2.4h-2.4zM208.8 44.8h2.4v2.4h-2.4zM212.8 44.8h2.4v2.4h-2.4zM216.8 44.8h2.4v2.4h-2.4zM220.8 44.8h2.4v2.4h-2.4zM224.8 44.8h2.4v2.4h-2.4zM228.8 44.8h2.4v2.4h-2.4zM232.8 44.8h2.4v2.4h-2.4zM236.8 44.8h2.4v2.4h-2.4zM240.8 44.8h2.4v2.4h-2.4zM244.8 44.8h2.4v2.4h-2.4zM248.8 44.8h2.4v2.4h-2.4zM252.8 44.8h2.4v2.4h-2.4zM256.8 44.8h2.4v2.4h-2.4zM260.8 44.8h2.4v2.4h-2.4zM264.8 44.8h2.4v2.4h-2.4zM268.8 44.8h2.4v2.4h-2.4zM272.8 44.8h2.4v2.4h-2.4zM276.8 44.8h2.4v2.4h-2.4zM280.8 44.8h2.4v2.4h-2.4zM284.8 44.8h2.4v2.4h-2.4zM288.8 44.8h2.4v2.4h-2.4zM292.8 44.8h2.4v2.4h-2.4zM296.8 44.8h2.4v2.4h-2.4zM300.8 44.8h2.4v2.4h-2.4zM304.8 44.8h2.4v2.4h-2.4zM316.8 44.8h2.4v2.4h-2.4zM60.8 48.8h2.4v2.4h-2.4zM64.8 48.8h2.4v2.4h-2.4zM68.8 48.8h2.4v2.4h-2.4zM72.8 48.8h2.4v2.4h-2.4zM76.8 48.8h2.4v2.4h-2.4zM80.8 48.8h2.4v2.4h-2.4zM84.8 48.8h2.4v2.4h-2.4zM88.8 48.8h2.4v2.4h-2.4zM92.8 48.8h2.4v2.4h-2.4zM96.8 48.8h2.4v2.4h-2.4zM100.8 48.8h2.4v2.4h-2.4zM180.8 48.8h2.4v2.4h-2.4zM184.8 48.8h2.4v2.4h-2.4zM188.8 48.8h2.4v2.4h-2.4zM204.8 48.8h2.4v2.4h-2.4zM212.8 48.8h2.4v2.4h-2.4zM216.8 48.8h2.4v2.4h-2.4zM220.8 48.8h2.4v2.4h-2.4zM224.8 48.8h2.4v2.4h-2.4zM228.8 48.8h2.4v2.4h-2.4zM232.8 48.8h2.4v2.4h-2.4zM236.8 48.8h2.4v2.4h-2.4zM240.8 48.8h2.4v2.4h-2.4zM244.8 48.8h2.4v2.4h-2.4zM248.8 48.8h2.4v2.4h-2.4zM252.8 48.8h2.4v2.4h-2.4zM256.8 48.8h2.4v2.4h-2.4zM260.8 48.8h2.4v2.4h-2.4zM264.8 48.8h2.4v2.4h-2.4zM268.8 48.8h2.4v2.4h-2.4zM272.8 48.8h2.4v2.4h-2.4zM276.8 48.8h2.4v2.4h-2.4zM280.8 48.8h2.4v2.4h-2.4zM284.8 48.8h2.4v2.4h-2.4zM288.8 48.8h2.4v2.4h-2.4zM292.8 48.8h2.4v2.4h-2.4zM296.8 48.8h2.4v2.4h-2.4zM300.8 48.8h2.4v2.4h-2.4zM64.8 52.8h2.4v2.4h-2.4zM68.8 52.8h2.4v2.4h-2.4zM72.8 52.8h2.4v2.4h-2.4zM76.8 52.8h2.4v2.4h-2.4zM80.8 52.8h2.4v2.4h-2.4zM84.8 52.8h2.4v2.4h-2.4zM88.8 52.8h2.4v2.4h-2.4zM92.8 52.8h2.4v2.4h-2.4zM96.8 52.8h2.4v2.4h-2.4zM176.8 52.8h2.4v2.4h-2.4zM180.8 52.8h2.4v2.4h-2.4zM184.8 52.8h2.4v2.4h-2.4zM188.8 52.8h2.4v2.4h-2.4zM192.8 52.8h2.4v2.4h-2.4zM196.8 52.8h2.4v2.4h-2.4zM200.8 52.8h2.4v2.4h-2.4zM204.8 52.8h2.4v2.4h-2.4zM208.8 52.8h2.4v2.4h-2.4zM216.8 52.8h2.4v2.4h-2.4zM220.8 52.8h2.4v2.4h-2.4zM224.8 52.8h2.4v2.4h-2.4zM228.8 52.8h2.4v2.4h-2.4zM232.8 52.8h2.4v2.4h-2.4zM236.8 52.8h2.4v2.4h-2.4zM240.8 52.8h2.4v2.4h-2.4zM244.8 52.8h2.4v2.4h-2.4zM248.8 52.8h2.4v2.4h-2.4zM252.8 52.8h2.4v2.4h-2.4zM256.8 52.8h2.4v2.4h-2.4zM260.8 52.8h2.4v2.4h-2.4zM264.8 52.8h2.4v2.4h-2.4zM268.8 52.8h2.4v2.4h-2.4zM272.8 52.8h2.4v2.4h-2.4zM276.8 52.8h2.4v2.4h-2.4zM280.8 52.8h2.4v2.4h-2.4zM284.8 52.8h2.4v2.4h-2.4zM288.8 52.8h2.4v2.4h-2.4zM292.8 52.8h2.4v2.4h-2.4zM296.8 52.8h2.4v2.4h-2.4zM68.8 56.8h2.4v2.4h-2.4zM72.8 56.8h2.4v2.4h-2.4zM76.8 56.8h2.4v2.4h-2.4zM80.8 56.8h2.4v2.4h-2.4zM168.8 56.8h2.4v2.4h-2.4zM172.8 56.8h2.4v2.4h-2.4zM176.8 56.8h2.4v2.4h-2.4zM180.8 56.8h2.4v2.4h-2.4zM184.8 56.8h2.4v2.4h-2.4zM188.8 56.8h2.4v2.4h-2.4zM192.8 56.8h2.4v2.4h-2.4zM196.8 56.8h2.4v2.4h-2.4zM200.8 56.8h2.4v2.4h-2.4zM204.8 56.8h2.4v2.4h-2.4zM208.8 56.8h2.4v2.4h-2.4zM212.8 56.8h2.4v2.4h-2.4zM216.8 56.8h2.4v2.4h-2.4zM220.8 56.8h2.4v2.4h-2.4zM224.8 56.8h2.4v2.4h-2.4zM228.8 56.8h2.4v2.4h-2.4zM232.8 56.8h2.4v2.4h-2.4zM236.8 56.8h2.4v2.4h-2.4zM240.8 56.8h2.4v2.4h-2.4zM244.8 56.8h2.4v2.4h-2.4zM248.8 56.8h2.4v2.4h-2.4zM252.8 56.8h2.4v2.4h-2.4zM256.8 56.8h2.4v2.4h-2.4zM260.8 56.8h2.4v2.4h-2.4zM264.8 56.8h2.4v2.4h-2.4zM268.8 56.8h2.4v2.4h-2.4zM272.8 56.8h2.4v2.4h-2.4zM276.8 56.8h2.4v2.4h-2.4zM280.8 56.8h2.4v2.4h-2.4zM284.8 56.8h2.4v2.4h-2.4zM288.8 56.8h2.4v2.4h-2.4zM292.8 56.8h2.4v2.4h-2.4zM296.8 56.8h2.4v2.4h-2.4zM300.8 56.8h2.4v2.4h-2.4zM72.8 60.8h2.4v2.4h-2.4zM76.8 60.8h2.4v2.4h-2.4zM80.8 60.8h2.4v2.4h-2.4zM100.8 60.8h2.4v2.4h-2.4zM164.8 60.8h2.4v2.4h-2.4zM168.8 60.8h2.4v2.4h-2.4zM172.8 60.8h2.4v2.4h-2.4zM176.8 60.8h2.4v2.4h-2.4zM180.8 60.8h2.4v2.4h-2.4zM184.8 60.8h2.4v2.4h-2.4zM188.8 60.8h2.4v2.4h-2.4zM192.8 60.8h2.4v2.4h-2.4zM196.8 60.8h2.4v2.4h-2.4zM200.8 60.8h2.4v2.4h-2.4zM204.8 60.8h2.4v2.4h-2.4zM208.8 60.8h2.4v2.4h-2.4zM212.8 60.8h2.4v2.4h-2.4zM216.8 60.8h2.4v2.4h-2.4zM220.8 60.8h2.4v2.4h-2.4zM224.8 60.8h2.4v2.4h-2.4zM228.8 60.8h2.4v2.4h-2.4zM232.8 60.8h2.4v2.4h-2.4zM248.8 60.8h2.4v2.4h-2.4zM252.8 60.8h2.4v2.4h-2.4zM256.8 60.8h2.4v2.4h-2.4zM260.8 60.8h2.4v2.4h-2.4zM264.8 60.8h2.4v2.4h-2.4zM268.8 60.8h2.4v2.4h-2.4zM272.8 60.8h2.4v2.4h-2.4zM276.8 60.8h2.4v2.4h-2.4zM280.8 60.8h2.4v2.4h-2.4zM284.8 60.8h2.4v2.4h-2.4zM288.8 60.8h2.4v2.4h-2.4zM296.8 60.8h2.4v2.4h-2.4zM300.8 60.8h2.4v2.4h-2.4zM80.8 64.8h2.4v2.4h-2.4zM84.8 64.8h2.4v2.4h-2.4zM88.8 64.8h2.4v2.4h-2.4zM100.8 64.8h2.4v2.4h-2.4zM108.8 64.8h2.4v2.4h-2.4zM112.8 64.8h2.4v2.4h-2.4zM164.8 64.8h2.4v2.4h-2.4zM168.8 64.8h2.4v2.4h-2.4zM172.8 64.8h2.4v2.4h-2.4zM176.8 64.8h2.4v2.4h-2.4zM180.8 64.8h2.4v2.4h-2.4zM184.8 64.8h2.4v2.4h-2.4zM188.8 64.8h2.4v2.4h-2.4zM192.8 64.8h2.4v2.4h-2.4zM196.8 64.8h2.4v2.4h-2.4zM200.8 64.8h2.4v2.4h-2.4zM204.8 64.8h2.4v2.4h-2.4zM208.8 64.8h2.4v2.4h-2.4zM212.8 64.8h2.4v2.4h-2.4zM216.8 64.8h2.4v2.4h-2.4zM220.8 64.8h2.4v2.4h-2.4zM224.8 64.8h2.4v2.4h-2.4zM228.8 64.8h2.4v2.4h-2.4zM252.8 64.8h2.4v2.4h-2.4zM256.8 64.8h2.4v2.4h-2.4zM260.8 64.8h2.4v2.4h-2.4zM272.8 64.8h2.4v2.4h-2.4zM276.8 64.8h2.4v2.4h-2.4zM288.8 64.8h2.4v2.4h-2.4zM292.8 64.8h2.4v2.4h-2.4zM92.8 68.8h2.4v2.4h-2.4zM120.8 68.8h2.4v2.4h-2.4zM164.8 68.8h2.4v2.4h-2.4zM168.8 68.8h2.4v2.4h-2.4zM172.8 68.8h2.4v2.4h-2.4zM176.8 68.8h2.4v2.4h-2.4zM180.8 68.8h2.4v2.4h-2.4zM184.8 68.8h2.4v2.4h-2.4zM188.8 68.8h2.4v2.4h-2.4zM192.8 68.8h2.4v2.4h-2.4zM196.8 68.8h2.4v2.4h-2.4zM200.8 68.8h2.4v2.4h-2.4zM204.8 68.8h2.4v2.4h-2.4zM208.8 68.8h2.4v2.4h-2.4zM212.8 68.8h2.4v2.4h-2.4zM216.8 68.8h2.4v2.4h-2.4zM220.8 68.8h2.4v2.4h-2.4zM224.8 68.8h2.4v2.4h-2.4zM252.8 68.8h2.4v2.4h-2.4zM256.8 68.8h2.4v2.4h-2.4zM272.8 68.8h2.4v2.4h-2.4zM276.8 68.8h2.4v2.4h-2.4zM292.8 68.8h2.4v2.4h-2.4zM296.8 68.8h2.4v2.4h-2.4zM300.8 68.8h2.4v2.4h-2.4zM104.8 72.8h2.4v2.4h-2.4zM108.8 72.8h2.4v2.4h-2.4zM112.8 72.8h2.4v2.4h-2.4zM116.8 72.8h2.4v2.4h-2.4zM164.8 72.8h2.4v2.4h-2.4zM168.8 72.8h2.4v2.4h-2.4zM172.8 72.8h2.4v2.4h-2.4zM176.8 72.8h2.4v2.4h-2.4zM180.8 72.8h2.4v2.4h-2.4zM184.8 72.8h2.4v2.4h-2.4zM188.8 72.8h2.4v2.4h-2.4zM192.8 72.8h2.4v2.4h-2.4zM196.8 72.8h2.4v2.4h-2.4zM200.8 72.8h2.4v2.4h-2.4zM204.8 72.8h2.4v2.4h-2.4zM208.8 72.8h2.4v2.4h-2.4zM212.8 72.8h2.4v2.4h-2.4zM216.8 72.8h2.4v2.4h-2.4zM220.8 72.8h2.4v2.4h-2.4zM224.8 72.8h2.4v2.4h-2.4zM228.8 72.8h2.4v2.4h-2.4zM260.8 72.8h2.4v2.4h-2.4zM272.8 72.8h2.4v2.4h-2.4zM292.8 72.8h2.4v2.4h-2.4zM300.8 72.8h2.4v2.4h-2.4zM100.8 76.8h2.4v2.4h-2.4zM104.8 76.8h2.4v2.4h-2.4zM108.8 76.8h2.4v2.4h-2.4zM112.8 76.8h2.4v2.4h-2.4zM116.8 76.8h2.4v2.4h-2.4zM120.8 76.8h2.4v2.4h-2.4zM124.8 76.8h2.4v2.4h-2.4zM168.8 76.8h2.4v2.4h-2.4zM172.8 76.8h2.4v2.4h-2.4zM176.8 76.8h2.4v2.4h-2.4zM180.8 76.8h2.4v2.4h-2.4zM184.8 76.8h2.4v2.4h-2.4zM188.8 76.8h2.4v2.4h-2.4zM192.8 76.8h2.4v2.4h-2.4zM196.8 76.8h2.4v2.4h-2.4zM200.8 76.8h2.4v2.4h-2.4zM204.8 76.8h2.4v2.4h-2.4zM208.8 76.8h2.4v2.4h-2.4zM212.8 76.8h2.4v2.4h-2.4zM216.8 76.8h2.4v2.4h-2.4zM220.8 76.8h2.4v2.4h-2.4zM224.8 76.8h2.4v2.4h-2.4zM260.8 76.8h2.4v2.4h-2.4zM88.8 80.8h2.4v2.4h-2.4zM100.8 80.8h2.4v2.4h-2.4zM104.8 80.8h2.4v2.4h-2.4zM108.8 80.8h2.4v2.4h-2.4zM112.8 80.8h2.4v2.4h-2.4zM116.8 80.8h2.4v2.4h-2.4zM120.8 80.8h2.4v2.4h-2.4zM124.8 80.8h2.4v2.4h-2.4zM128.8 80.8h2.4v2.4h-2.4zM184.8 80.8h2.4v2.4h-2.4zM188.8 80.8h2.4v2.4h-2.4zM192.8 80.8h2.4v2.4h-2.4zM196.8 80.8h2.4v2.4h-2.4zM200.8 80.8h2.4v2.4h-2.4zM204.8 80.8h2.4v2.4h-2.4zM208.8 80.8h2.4v2.4h-2.4zM212.8 80.8h2.4v2.4h-2.4zM216.8 80.8h2.4v2.4h-2.4zM220.8 80.8h2.4v2.4h-2.4zM252.8 80.8h2.4v2.4h-2.4zM276.8 80.8h2.4v2.4h-2.4zM288.8 80.8h2.4v2.4h-2.4zM292.8 80.8h2.4v2.4h-2.4zM296.8 80.8h2.4v2.4h-2.4zM88.8 84.8h2.4v2.4h-2.4zM100.8 84.8h2.4v2.4h-2.4zM104.8 84.8h2.4v2.4h-2.4zM108.8 84.8h2.4v2.4h-2.4zM112.8 84.8h2.4v2.4h-2.4zM116.8 84.8h2.4v2.4h-2.4zM120.8 84.8h2.4v2.4h-2.4zM124.8 84.8h2.4v2.4h-2.4zM128.8 84.8h2.4v2.4h-2.4zM132.8 84.8h2.4v2.4h-2.4zM188.8 84.8h2.4v2.4h-2.4zM192.8 84.8h2.4v2.4h-2.4zM196.8 84.8h2.4v2.4h-2.4zM200.8 84.8h2.4v2.4h-2.4zM204.8 84.8h2.4v2.4h-2.4zM208.8 84.8h2.4v2.4h-2.4zM212.8 84.8h2.4v2.4h-2.4zM216.8 84.8h2.4v2.4h-2.4zM280.8 84.8h2.4v2.4h-2.4zM288.8 84.8h2.4v2.4h-2.4zM292.8 84.8h2.4v2.4h-2.4zM300.8 84.8h2.4v2.4h-2.4zM312.8 84.8h2.4v2.4h-2.4zM100.8 88.8h2.4v2.4h-2.4zM104.8 88.8h2.4v2.4h-2.4zM108.8 88.8h2.4v2.4h-2.4zM112.8 88.8h2.4v2.4h-2.4zM116.8 88.8h2.4v2.4h-2.4zM120.8 88.8h2.4v2.4h-2.4zM124.8 88.8h2.4v2.4h-2.4zM128.8 88.8h2.4v2.4h-2.4zM132.8 88.8h2.4v2.4h-2.4zM136.8 88.8h2.4v2.4h-2.4zM140.8 88.8h2.4v2.4h-2.4zM188.8 88.8h2.4v2.4h-2.4zM192.8 88.8h2.4v2.4h-2.4zM196.8 88.8h2.4v2.4h-2.4zM200.8 88.8h2.4v2.4h-2.4zM204.8 88.8h2.4v2.4h-2.4zM208.8 88.8h2.4v2.4h-2.4zM212.8 88.8h2.4v2.4h-2.4zM216.8 88.8h2.4v2.4h-2.4zM312.8 88.8h2.4v2.4h-2.4zM316.8 88.8h2.4v2.4h-2.4zM320.8 88.8h2.4v2.4h-2.4zM104.8 92.8h2.4v2.4h-2.4zM108.8 92.8h2.4v2.4h-2.4zM112.8 92.8h2.4v2.4h-2.4zM116.8 92.8h2.4v2.4h-2.4zM120.8 92.8h2.4v2.4h-2.4zM124.8 92.8h2.4v2.4h-2.4zM128.8 92.8h2.4v2.4h-2.4zM132.8 92.8h2.4v2.4h-2.4zM136.8 92.8h2.4v2.4h-2.4zM140.8 92.8h2.4v2.4h-2.4zM192.8 92.8h2.4v2.4h-2.4zM196.8 92.8h2.4v2.4h-2.4zM200.8 92.8h2.4v2.4h-2.4zM204.8 92.8h2.4v2.4h-2.4zM208.8 92.8h2.4v2.4h-2.4zM212.8 92.8h2.4v2.4h-2.4zM216.8 92.8h2.4v2.4h-2.4zM336.8 92.8h2.4v2.4h-2.4zM340.8 92.8h2.4v2.4h-2.4zM4.8 96.8h2.4v2.4h-2.4zM8.8 96.8h2.4v2.4h-2.4zM104.8 96.8h2.4v2.4h-2.4zM108.8 96.8h2.4v2.4h-2.4zM112.8 96.8h2.4v2.4h-2.4zM116.8 96.8h2.4v2.4h-2.4zM120.8 96.8h2.4v2.4h-2.4zM124.8 96.8h2.4v2.4h-2.4zM128.8 96.8h2.4v2.4h-2.4zM132.8 96.8h2.4v2.4h-2.4zM136.8 96.8h2.4v2.4h-2.4zM192.8 96.8h2.4v2.4h-2.4zM196.8 96.8h2.4v2.4h-2.4zM200.8 96.8h2.4v2.4h-2.4zM204.8 96.8h2.4v2.4h-2.4zM208.8 96.8h2.4v2.4h-2.4zM212.8 96.8h2.4v2.4h-2.4zM308.8 96.8h2.4v2.4h-2.4zM312.8 96.8h2.4v2.4h-2.4zM316.8 96.8h2.4v2.4h-2.4zM320.8 96.8h2.4v2.4h-2.4zM344.8 96.8h2.4v2.4h-2.4zM108.8 100.8h2.4v2.4h-2.4zM112.8 100.8h2.4v2.4h-2.4zM116.8 100.8h2.4v2.4h-2.4zM120.8 100.8h2.4v2.4h-2.4zM124.8 100.8h2.4v2.4h-2.4zM128.8 100.8h2.4v2.4h-2.4zM132.8 100.8h2.4v2.4h-2.4zM136.8 100.8h2.4v2.4h-2.4zM192.8 100.8h2.4v2.4h-2.4zM196.8 100.8h2.4v2.4h-2.4zM200.8 100.8h2.4v2.4h-2.4zM204.8 100.8h2.4v2.4h-2.4zM208.8 100.8h2.4v2.4h-2.4zM212.8 100.8h2.4v2.4h-2.4zM224.8 100.8h2.4v2.4h-2.4zM300.8 100.8h2.4v2.4h-2.4zM304.8 100.8h2.4v2.4h-2.4zM308.8 100.8h2.4v2.4h-2.4zM312.8 100.8h2.4v2.4h-2.4zM316.8 100.8h2.4v2.4h-2.4zM320.8 100.8h2.4v2.4h-2.4zM344.8 100.8h2.4v2.4h-2.4zM356.8 100.8h2.4v2.4h-2.4zM108.8 104.8h2.4v2.4h-2.4zM112.8 104.8h2.4v2.4h-2.4zM116.8 104.8h2.4v2.4h-2.4zM120.8 104.8h2.4v2.4h-2.4zM124.8 104.8h2.4v2.4h-2.4zM128.8 104.8h2.4v2.4h-2.4zM132.8 104.8h2.4v2.4h-2.4zM192.8 104.8h2.4v2.4h-2.4zM196.8 104.8h2.4v2.4h-2.4zM200.8 104.8h2.4v2.4h-2.4zM204.8 104.8h2.4v2.4h-2.4zM208.8 104.8h2.4v2.4h-2.4zM224.8 104.8h2.4v2.4h-2.4zM292.8 104.8h2.4v2.4h-2.4zM296.8 104.8h2.4v2.4h-2.4zM300.8 104.8h2.4v2.4h-2.4zM304.8 104.8h2.4v2.4h-2.4zM308.8 104.8h2.4v2.4h-2.4zM312.8 104.8h2.4v2.4h-2.4zM316.8 104.8h2.4v2.4h-2.4zM320.8 104.8h2.4v2.4h-2.4zM324.8 104.8h2.4v2.4h-2.4zM344.8 104.8h2.4v2.4h-2.4zM108.8 108.8h2.4v2.4h-2.4zM112.8 108.8h2.4v2.4h-2.4zM116.8 108.8h2.4v2.4h-2.4zM120.8 108.8h2.4v2.4h-2.4zM124.8 108.8h2.4v2.4h-2.4zM128.8 108.8h2.4v2.4h-2.4zM196.8 108.8h2.4v2.4h-2.4zM200.8 108.8h2.4v2.4h-2.4zM204.8 108.8h2.4v2.4h-2.4zM208.8 108.8h2.4v2.4h-2.4zM292.8 108.8h2.4v2.4h-2.4zM296.8 108.8h2.4v2.4h-2.4zM300.8 108.8h2.4v2.4h-2.4zM304.8 108.8h2.4v2.4h-2.4zM308.8 108.8h2.4v2.4h-2.4zM312.8 108.8h2.4v2.4h-2.4zM316.8 108.8h2.4v2.4h-2.4zM320.8 108.8h2.4v2.4h-2.4zM324.8 108.8h2.4v2.4h-2.4zM328.8 108.8h2.4v2.4h-2.4zM108.8 112.8h2.4v2.4h-2.4zM112.8 112.8h2.4v2.4h-2.4zM116.8 112.8h2.4v2.4h-2.4zM120.8 112.8h2.4v2.4h-2.4zM124.8 112.8h2.4v2.4h-2.4zM196.8 112.8h2.4v2.4h-2.4zM200.8 112.8h2.4v2.4h-2.4zM204.8 112.8h2.4v2.4h-2.4zM292.8 112.8h2.4v2.4h-2.4zM296.8 112.8h2.4v2.4h-2.4zM300.8 112.8h2.4v2.4h-2.4zM304.8 112.8h2.4v2.4h-2.4zM308.8 112.8h2.4v2.4h-2.4zM312.8 112.8h2.4v2.4h-2.4zM316.8 112.8h2.4v2.4h-2.4zM320.8 112.8h2.4v2.4h-2.4zM324.8 112.8h2.4v2.4h-2.4zM328.8 112.8h2.4v2.4h-2.4zM108.8 116.8h2.4v2.4h-2.4zM112.8 116.8h2.4v2.4h-2.4zM116.8 116.8h2.4v2.4h-2.4zM120.8 116.8h2.4v2.4h-2.4zM312.8 116.8h2.4v2.4h-2.4zM316.8 116.8h2.4v2.4h-2.4zM320.8 116.8h2.4v2.4h-2.4zM324.8 116.8h2.4v2.4h-2.4zM328.8 116.8h2.4v2.4h-2.4zM108.8 120.8h2.4v2.4h-2.4zM112.8 120.8h2.4v2.4h-2.4zM116.8 120.8h2.4v2.4h-2.4zM320.8 120.8h2.4v2.4h-2.4zM324.8 120.8h2.4v2.4h-2.4zM352.8 120.8h2.4v2.4h-2.4zM108.8 124.8h2.4v2.4h-2.4zM112.8 124.8h2.4v2.4h-2.4zM324.8 124.8h2.4v2.4h-2.4zM108.8 128.8h2.4v2.4h-2.4zM112.8 128.8h2.4v2.4h-2.4zM348.8 128.8h2.4v2.4h-2.4zM108.8 132.8h2.4v2.4h-2.4zM120.8 132.8h2.4v2.4h-2.4zM140.8 136.8h2.4v2.4h-2.4z"};
+
+const CITIES = window.CITY_DATA.cities;
+const MAP = window.MAP_DATA;
+const params = new URLSearchParams(location.search);
+const urlLang = params.get('lang');
+let lang = urlLang === 'en' || urlLang === 'zh'
+  ? urlLang : (localStorage.getItem('citysign-lang') || 'zh');
+const urlCity = params.get('city');
+let current = CITIES.find(c => c.id === (urlCity||'beijing')) || CITIES[0];
+let wx = null, sun = null;
+const coordStyle = 'symbols'; // 固定为符号写法（39.90°N · 116.41°E），无切换按钮
+let quoteIndex = 0;
+const SKINS = ['skin-warm','skin-cool','skin-dusk','skin-night','skin-film','skin-vivid','skin-dawn'];
+
+const $ = id => document.getElementById(id);
+const isZh = () => lang === 'zh';
+
+function toast(msg){ const t=$('toast'); t.textContent=msg; t.classList.add('show');
+  clearTimeout(toast._t); toast._t=setTimeout(()=>t.classList.remove('show'),2200); }
+
+/* ---------- 语言 ---------- */
+function t(el, zh, en){ el.textContent = isZh() ? zh : en; }
+function applyStaticLang(){
+  document.documentElement.lang = isZh() ? 'zh-CN' : 'en';
+  document.querySelectorAll('[data-zh]').forEach(el => {
+    el.textContent = isZh() ? el.dataset.zh : el.dataset.en;
+  });
+  $('langZh').classList.toggle('on', isZh());
+  $('langEn').classList.toggle('on', !isZh());
+  $('search').placeholder = isZh() ? '搜索城市 / Search city…' : 'Search city / 搜索城市…';
+}
+$('langZh').onclick = () => { lang='zh'; localStorage.setItem('citysign-lang',lang); applyStaticLang(); render(); };
+$('langEn').onclick = () => { lang='en'; localStorage.setItem('citysign-lang',lang); applyStaticLang(); render(); };
+
+/* ---------- 坐标写法 ---------- */
+function fmtCoord(c, style){
+  const st = style || coordStyle;
+  const lat = Math.abs(c.lat).toFixed(2), lon = Math.abs(c.lon).toFixed(2);
+  if(st === 'symbols'){
+    return `${lat}°${c.lat>=0?'N':'S'} · ${lon}°${c.lon>=0?'E':'W'}`;
+  }
+  return isZh()
+    ? `${c.lat>=0?'北纬':'南纬'} ${lat}° · ${c.lon>=0?'东经':'西经'} ${lon}°`
+    : `${c.lat>=0?'Lat ':'Lat -'}${lat}° · ${c.lon>=0?'Lon ':'Lon -'}${lon}°`;
+}
+
+function fmtPop(c){ return isZh() ? `约 ${c.popWan.toLocaleString('zh-CN')} 万` : `≈ ${(c.popWan/100).toFixed(1)}M`; }
+function fmtArea(c){ return isZh() ? `约 ${c.areaKm2.toLocaleString('zh-CN')} km²` : `≈ ${c.areaKm2.toLocaleString('en-US')} km²`; }
+function hemi(c){
+  const a = isZh() ? (c.lat>=0?'北半球':'南半球') : (c.lat>=0?'N. Hemisphere':'S. Hemisphere');
+  const b = isZh() ? (c.lon>=0?'东半球':'西半球') : (c.lon>=0?'E. Hemisphere':'W. Hemisphere');
+  return a + ' · ' + b;
+}
+function offsetOf(tz){
+  try {
+    const parts = new Intl.DateTimeFormat('en',{timeZone:tz,timeZoneName:'shortOffset'}).formatToParts(new Date());
+    const p = parts.find(x=>x.type==='timeZoneName');
+    return p ? p.value.replace('GMT','UTC') : tz;
+  } catch(e){ return tz; }
+}
+function localClock(tz, withDate){
+  const d = new Date();
+  const time = new Intl.DateTimeFormat(isZh()?'zh-CN':'en-GB',
+    {timeZone:tz,hour:'2-digit',minute:'2-digit',hour12:false}).format(d);
+  if(!withDate) return time;
+  const date = new Intl.DateTimeFormat(isZh()?'zh-CN':'en-GB',
+    {timeZone:tz,year:'numeric',month:'long',day:'numeric',weekday:'long'}).format(d);
+  return date + ' · ' + time;
+}
+function issueNo(c, d){
+  const ymd = `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
+  return `No.${c.id.slice(0,3).toUpperCase()}-${ymd}`;
+}
+
+/* ---------- 城市选择与搜索 ---------- */
+function cityButton(c){
+  return `<button data-id="${c.id}" class="${c.id===current.id?'on':''}">
+    <span>${isZh()?c.zh+' <small>'+c.en+'</small>':c.en+' <small>'+c.zh+'</small>'}</span>
+    <small>${isZh()?c.countryZh:c.countryEn}</small></button>`;
+}
+function bindPicker(box){
+  box.hidden = false;
+  box.querySelectorAll('button').forEach(b=>b.onclick=()=>{
+    selectCity(b.dataset.id); box.hidden = true; $('search').value='';
+  });
+}
+function renderPicker(query){
+  const q = (query||'').trim().toLowerCase();
+  const list = CITIES.filter(c => !q ||
+    c.zh.toLowerCase().includes(q) || c.en.toLowerCase().includes(q) ||
+    c.countryZh.includes(q) || c.countryEn.toLowerCase().includes(q) ||
+    c.nickname.includes(q) || c.tags.some(t=>t.includes(q)) ||
+    c.landmarks.some(l=>l.includes(q)));
+  const box = $('picker');
+  if(!list.length){ box.hidden = true; return; }
+  if(q){
+    box.innerHTML = `<div class="grp">${isZh()?'匹配城市 · MATCHING CITIES':'MATCHING CITIES'} (${list.length})</div>` +
+      list.slice(0,60).map(cityButton).join('');
+  }else{
+    const groups = {};
+    list.forEach(c=>{ const key = isZh()?c.continent:c.continentEn; (groups[key]=groups[key]||[]).push(c); });
+    box.innerHTML = Object.entries(groups).map(([g,cs])=>
+      `<div class="grp">${g} · ${cs.length}</div>` + cs.map(cityButton).join('')).join('');
+  }
+  bindPicker(box);
+}
+$('search').addEventListener('input', e=>renderPicker(e.target.value));
+$('search').addEventListener('focus', e=>renderPicker(e.target.value));
+$('clear').onclick = ()=>{ $('search').value=''; $('picker').hidden=true; };
+document.addEventListener('click', e=>{
+  if(!e.target.closest('.search-wrap')) $('picker').hidden=true;
+  if(!e.target.closest('.export-menu')) $('exportPop').hidden=true;
+});
+$('randomBtn').onclick = ()=>{
+  const pool = CITIES.filter(c=>c.id!==current.id);
+  selectCity(pool[Math.floor(Math.random()*pool.length)].id);
+};
+
+/* ---------- 世界位置小地图（自包含点阵，不画国界、不标国名） ---------- */
+function mapXY(lon, lat){ return [lon + 180, MAP.top - lat]; }
+function renderMap(c){
+  const x = c.lon + 180, y = MAP.top - c.lat;
+  const svg = `<svg viewBox="0 0 ${MAP.w} ${MAP.h}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="城市在世界地图中的位置示意">
+    <rect width="${MAP.w}" height="${MAP.h}" rx="5" fill="#f3f1ea"/>
+    ${[-150,-120,-90,-60,-30,0,30,60,90,120,150].map(g=>`<path d="M${g+180} 0V${MAP.h}" stroke="#e2ded4" stroke-width="0.6"/>`).join('')}
+    ${[-30,0,30,60].map(g=>`<path d="M0 ${MAP.top-g}H${MAP.w}" stroke="#e2ded4" stroke-width="0.6"/>`).join('')}
+    <path d="M0 ${MAP.top}H${MAP.w}" stroke="#cfc9bb" stroke-width="0.8"/>
+    <path d="M180 0V${MAP.h}" stroke="#cfc9bb" stroke-width="0.8"/>
+    <path d="${MAP.dots}" fill="#8f9c92"/>
+    <path d="M0 ${y.toFixed(1)}H${MAP.w}" stroke="#a9553d" stroke-width="0.5" stroke-dasharray="3 2.5" opacity="0.6"/>
+    <path d="M${x.toFixed(1)} 0V${MAP.h}" stroke="#a9553d" stroke-width="0.5" stroke-dasharray="3 2.5" opacity="0.6"/>
+    <circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4.4" fill="none" stroke="#a9553d" stroke-width="1.2" opacity="0.6"/>
+    <circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2.4" fill="#a9553d"/>
+    <text x="7" y="${(MAP.h-4).toFixed(1)}" class="map-tz-label" font-size="11" fill="#5d7568">${offsetOf(c.tz)}</text>
+  </svg>`;
+  $('mapBox').innerHTML = svg;
+  $('mapCoord').textContent = fmtCoord(c);
+  $('mapTz').textContent = `${c.tz} · ${offsetOf(c.tz)}`;
+  t($('mapNote'), '十字准线标出城市位置；大陆为点阵示意，不标注国界。',
+    'Crosshair marks the city; continents are a dot-matrix sketch, no borders shown.');
+}
+
+/* ---------- 实景图与皮肤 ---------- */
+function setImage(c){
+  const img = $('heroImg');
+  const src = `assets/cities/${c.id}.jpg`;
+  img.onerror = ()=>{ img.style.display='none'; img.style.opacity='0'; $('fallback').style.display='block'; };
+  img.onload = ()=>{ img.style.display='block'; img.style.opacity='1'; $('fallback').style.display='none'; };
+  img.style.display='block'; img.style.opacity='0';
+  img.src = src;
+  renderFallback(c);
+  pickSkin(); // 每次换城随机换肤
+}
+function pickSkin(){
+  const hero = $('hero');
+  let pool = SKINS.slice();
+  // 依据此刻天气挑选候选：晴/暖、雨雾/冷、夜/暗
+  if(wx){
+    const code = wx.weather_code;
+    const hour = parseInt(localClock(current.tz,false).slice(0,2),10);
+    if(hour<=5 || hour>=19) pool=['skin-night','skin-dusk','skin-cool'];
+    else if(code>=51 && code<=67) pool=['skin-cool','skin-film','skin-dawn'];
+    else if(code>=71) pool=['skin-cool','skin-dawn','skin-film'];
+    else if(code>=45 && code<=48) pool=['skin-film','skin-cool','skin-dawn'];
+    else if(code===0 || code===1) pool=['skin-warm','skin-vivid','skin-dawn','skin-dusk'];
+  }
+  let pick = pool[Math.floor(Math.random()*pool.length)];
+  if(pool.length>1 && pick===hero.dataset.skin){
+    pick = pool[(pool.indexOf(pick)+1)%pool.length];
+  }
+  hero.dataset.skin = pick;
+  hero.className = 'hero ' + pick;
+}
+$('skinBtn').onclick = ()=>{
+  const hero=$('hero');
+  const pool=SKINS.filter(s=>s!==hero.dataset.skin);
+  const pick=pool[Math.floor(Math.random()*pool.length)];
+  hero.dataset.skin=pick; hero.className='hero '+pick;
+  toast(isZh()?'已换一张风格':'Look changed');
+};
+function renderFallback(c){
+  const svg = `<svg viewBox="0 0 760 338" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+  <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#8fa3ad"/><stop offset="1" stop-color="#d9cfc0"/>
+  </linearGradient></defs>
+  <rect width="760" height="338" fill="url(#g)"/>
+  <circle cx="600" cy="82" r="34" fill="#f6e7c9" opacity=".75"/>
+  <path d="M0 268 L70 210 L130 236 L200 168 L265 222 L340 150 L410 214 L480 176 L550 226 L630 160 L700 216 L760 186 L760 338 L0 338Z" fill="#6d7f7a" opacity=".55"/>
+  <path d="M0 292 L95 244 L180 270 L260 224 L350 268 L440 222 L530 264 L620 230 L710 270 L760 248 L760 338 L0 338Z" fill="#4c5b57" opacity=".7"/>
+  <text x="380" y="128" text-anchor="middle" fill="#fff" opacity=".82" font-family="Georgia,serif" font-size="15" letter-spacing="3">${c.en.toUpperCase()}</text>
+  </svg>`;
+  $('fallback').innerHTML = svg;
+}
+
+/* ---------- 天气 ---------- */
+const WMO = {
+ 0:['晴','Clear'],1:['大部晴朗','Mainly clear'],2:['局部多云','Partly cloudy'],3:['阴','Overcast'],
+ 45:['有雾','Foggy'],48:['雾凇','Rime fog'],51:['毛毛雨','Light drizzle'],53:['毛毛雨','Drizzle'],
+ 55:['浓毛毛雨','Dense drizzle'],56:['冻毛毛雨','Freezing drizzle'],57:['冻毛毛雨','Freezing drizzle'],
+ 61:['小雨','Light rain'],63:['中雨','Moderate rain'],65:['大雨','Heavy rain'],
+ 66:['冻雨','Freezing rain'],67:['冻雨','Freezing rain'],71:['小雪','Light snow'],
+ 73:['中雪','Moderate snow'],75:['大雪','Heavy snow'],77:['雪粒','Snow grains'],
+ 80:['阵雨','Rain showers'],81:['强阵雨','Heavy showers'],82:['暴雨','Violent showers'],
+ 85:['阵雪','Snow showers'],86:['强阵雪','Heavy snow showers'],95:['雷暴','Thunderstorm'],
+ 96:['雷暴伴冰雹','Thunderstorm, hail'],99:['雷暴伴大雹','Thunderstorm, heavy hail']
+};
+function wxIcon(code){
+  if(code===0||code===1) return '☀️';
+  if(code===2||code===3) return '⛅';
+  if(code>=45&&code<=48) return '🌫️';
+  if(code>=51&&code<=67||code>=80&&code<=82) return '🌧️';
+  if(code>=71&&code<=77||code>=85&&code<=86) return '❄️';
+  if(code>=95) return '⛈️';
+  return '🌡️';
+}
+async function fetchWeather(c){
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${c.lat}&longitude=${c.lon}`+
+    `&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m`+
+    `&daily=sunrise,sunset&timezone=auto&forecast_days=1`;
+  try{
+    const res = await fetch(url);
+    const d = await res.json();
+    if(!d.current) throw new Error('no current');
+    wx = d.current; sun = d.daily;
+    renderWeather(c); pickSkin();
+  }catch(e){ wx=null; sun=null; renderWeather(c); }
+}
+function renderWeather(c){
+  if(wx){
+    const code = wx.weather_code;
+    const desc = WMO[code] ? (isZh()?WMO[code][0]:WMO[code][1]) : '—';
+    $('wxIcon').textContent = wxIcon(code);
+    $('wxTemp').textContent = `${wx.temperature_2m.toFixed(1)}°C`;
+    const extra = isZh()
+      ? `${desc} · 体感 ${wx.apparent_temperature.toFixed(1)}° · 湿度 ${wx.relative_humidity_2m}% · 风 ${wx.wind_speed_10m} km/h`
+      : `${desc} · feels ${wx.apparent_temperature.toFixed(1)}° · humidity ${wx.relative_humidity_2m}% · wind ${wx.wind_speed_10m} km/h`;
+    $('wxNote').textContent = extra;
+    $('localTime').textContent = localClock(c.tz,false);
+  }else{
+    $('wxIcon').textContent='◌'; $('wxTemp').textContent='—';
+    t($('wxNote'),'天气暂不可用','Weather unavailable');
+  }
+  $('localDate').textContent = localClock(c.tz, true);
+  if(sun && sun.sunrise && sun.sunset){
+    $('sunTime').textContent = `${sun.sunrise[0].slice(11,16)} / ${sun.sunset[0].slice(11,16)}`;
+    t($('sunNote'),'日出 / 日落（当地）','Sunrise / sunset (local)');
+  }else{
+    $('sunTime').textContent='—'; t($('sunNote'),'日照数据暂不可用','Sun data unavailable');
+  }
+}
+
+/* ---------- 句子 ---------- */
+function linesOf(c){ return (c.lines && c.lines.length) ? c.lines : []; }
+function renderQuote(c){
+  const lines = linesOf(c);
+  if(!lines.length){ $('quoteText').textContent='—'; $('quoteCount').textContent='0/0'; return; }
+  if(quoteIndex>=lines.length) quoteIndex=0;
+  if(quoteIndex<0) quoteIndex=lines.length-1;
+  const ln = lines[quoteIndex];
+  $('quoteKind').textContent = isZh()?ln.kindZh:ln.kindEn;
+  $('quoteText').textContent = isZh()?ln.zh:ln.en;
+  $('quoteAuthor').textContent = '— ' + (isZh()?ln.byZh:ln.byEn);
+  $('quoteCount').textContent = `${quoteIndex+1}/${lines.length}`;
+  // 双语：中文界面下英文句附于下方；英文界面下中文原文附于下方（不同句时）
+  if(isZh() && ln.zh!==ln.en){
+    $('quoteEn').textContent = ln.en; $('quoteEn').hidden=false;
+  }else if(!isZh() && ln.zh!==ln.en){
+    $('quoteEn').textContent = ln.zh; $('quoteEn').hidden=false;
+  }else{
+    $('quoteEn').hidden=true;
+  }
+  const many = lines.length>1;
+  $('quotePrev').style.display = many?'flex':'none';
+  $('quoteNext').style.display = many?'flex':'none';
+}
+$('quotePrev').onclick = ()=>{ quoteIndex--; renderQuote(current); };
+$('quoteNext').onclick = ()=>{ quoteIndex++; renderQuote(current); };
+
+/* ---------- 主体渲染 ---------- */
+function render(){
+  const c = current;
+  applyStaticLang();
+  $('coord').textContent = fmtCoord(c);
+  $('kicker').textContent = isZh() ? '城市图鉴 · CITY SIGN' : 'THE CITY · CITY SIGN';
+  $('issue').textContent = issueNo(c, new Date());
+
+  const country = isZh() ? c.countryZh : c.countryEn;
+  const place = isZh()
+    ? `${c.continent} · ${c.region} · ${country}`
+    : `${c.countryEn} · ${c.regionEn} · ${c.continentEn}`;
+  $('cityName').textContent = isZh() ? c.zh : c.en;
+  $('cityEn').textContent = isZh() ? c.en : c.zh;
+  $('citySub').textContent = `${place}　|　${isZh()?c.nickname:c.en}`;
+
+  const facts = [
+    [isZh()?'位置 · LOCATION':'LOCATION', isZh()?`${country} · ${c.region}`:`${country} · ${c.regionEn}`],
+    [isZh()?'人口 · POPULATION':'POPULATION', fmtPop(c)],
+    [isZh()?'面积 · AREA':'AREA', fmtArea(c)],
+    [isZh()?'气候 · CLIMATE':'CLIMATE', isZh()?c.climate:c.climateEn],
+    [isZh()?'半球 · HEMISPHERE':'HEMISPHERE', hemi(c)],
+    [isZh()?'时区 · TIME ZONE':'TIME ZONE', `${c.tz} · ${offsetOf(c.tz)}`],
+  ];
+  $('facts').innerHTML = facts.map(([k,v])=>
+    `<div><p class="fact-l">${k}</p><p class="fact-v">${v}</p></div>`).join('');
+
+  $('sights').innerHTML = (isZh()?c.landmarks:c.landmarksEn).slice(0,3)
+    .map(x=>`<span class="tag">${x}</span>`).join('');
+  $('foods').innerHTML = (isZh()?c.foods.zh:c.foods.en).slice(0,3)
+    .map(x=>`<span class="tag food">${x}</span>`).join('');
+
+  renderMap(c);
+  renderQuote(c);
+
+  setImage(c);
+  clearInterval(localTimeTimer);
+  localTimeTimer = setInterval(()=>{
+    $('localTime').textContent = localClock(c.tz,false);
+    $('localDate').textContent = localClock(c.tz,true);
+  }, 30000);
+  fetchWeather(c);
+}
+let localTimeTimer = null;
+function selectCity(id){
+  const c = CITIES.find(x=>x.id===id);
+  if(!c) return;
+  current = c; quoteIndex=0;
+  wx=null; sun=null;
+  render();
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+/* ---------- 导出 ---------- */
+$('exportBtn').onclick = (e)=>{ e.stopPropagation(); $('exportPop').hidden=!$('exportPop').hidden; };
+$('expPdf').onclick = ()=>{ $('exportPop').hidden=true; window.print(); };
+function dataURL(url){
+  return new Promise((resolve,reject)=>{
+    fetch(url).then(r=>r.blob()).then(b=>{
+      const fr=new FileReader();
+      fr.onload=()=>resolve(fr.result); fr.onerror=reject; fr.readAsDataURL(b);
+    }).catch(reject);
+  });
+}
+function download(href, name){
+  const a=document.createElement('a'); a.href=href; a.download=name;
+  document.body.appendChild(a); a.click(); a.remove();
+}
+function safeName(){ return `城签-${current.zh.replace(/[·\s]/g,'')}-${new Date().toISOString().slice(0,10)}`; }
+
+$('expHtml').onclick = async ()=>{
+  $('exportPop').hidden=true;
+  toast(isZh()?'正在生成单文件 HTML…':'Building standalone HTML…');
+  try{
+    const clone = document.documentElement.cloneNode(true);
+    // 内嵌当前实景图为 base64
+    const img = clone.querySelector('#heroImg');
+    if(img){ try{ img.src = await dataURL(`assets/cities/${current.id}.jpg`); }catch(e){} }
+    // 内嵌地图 SVG 已随 DOM 存在；移除控制条、提示、toast 与脚本
+    const bar=clone.querySelector('.toolbar'); if(bar) bar.remove();
+    const hint=clone.querySelector('.hint'); if(hint) hint.remove();
+    const toastEl=clone.querySelector('#toast'); if(toastEl) toastEl.remove();
+    const skinBtn=clone.querySelector('#skinBtn'); if(skinBtn) skinBtn.remove();
+    const qnav=clone.querySelector('.quote-nav'); if(qnav) qnav.remove();
+    clone.querySelectorAll('script').forEach(s=>s.remove());
+    // 冻结皮肤到当前 class（已在 DOM 的 hero class 上）
+    const html='<!DOCTYPE html>\n'+clone.outerHTML;
+    const blob=new Blob([html],{type:'text/html;charset=utf-8'});
+    const url=URL.createObjectURL(blob);
+    download(url, safeName()+'.html');
+    setTimeout(()=>URL.revokeObjectURL(url), 4000);
+    toast(isZh()?'已导出单文件 HTML':'Standalone HTML exported');
+  }catch(e){ toast(isZh()?'导出失败：'+e.message:'Export failed: '+e.message); }
+};
+
+/* 纯 canvas 手绘海报，规避 foreignObject + 图片导致的 canvas 污染 */
+function loadImage(src){
+  return new Promise((res,rej)=>{ const im=new Image(); im.onload=()=>res(im); im.onerror=rej; im.src=src; });
+}
+function wrapText(ctx, text, x, y, maxW, lineH, maxLines){
+  const chars=[...text]; let line='', lines=[];
+  for(const ch of chars){
+    if(ctx.measureText(line+ch).width>maxW && line){ lines.push(line); line=ch; }
+    else line+=ch;
+  }
+  if(line) lines.push(line);
+  if(maxLines && lines.length>maxLines){ lines=lines.slice(0,maxLines); lines[maxLines-1]=lines[maxLines-1].slice(0,-1)+'…'; }
+  lines.forEach((l,i)=>ctx.fillText(l,x,y+i*lineH));
+  return lines.length;
+}
+$('expPng').onclick = async ()=>{
+  $('exportPop').hidden=true;
+  toast(isZh()?'正在生成 PNG…':'Rendering PNG…');
+  try{
+    const c = current;
+    const W=760, H=1120, S=2;
+    const canvas=document.createElement('canvas');
+    canvas.width=W*S; canvas.height=H*S;
+    const ctx=canvas.getContext('2d'); ctx.scale(S,S);
+    const FONT='"PingFang SC","Microsoft YaHei","Microsoft YaHei UI",sans-serif';
+    const SERIF='"Songti SC","SimSun",Georgia,serif';
+
+    // 背景
+    ctx.fillStyle='#ffffff'; ctx.fillRect(0,0,W,H);
+
+    // 头图
+    const heroH=360;
+    let hero=null;
+    try{ hero=await loadImage(`assets/cities/${c.id}.jpg`); }catch(e){}
+    if(hero){
+      // cover 裁切
+      const iw=hero.width, ih=hero.height;
+      const scale=Math.max(W/iw, heroH/ih);
+      const dw=iw*scale, dh=ih*scale;
+      ctx.save(); ctx.beginPath(); ctx.rect(0,0,W,heroH); ctx.clip();
+      ctx.drawImage(hero,(W-dw)/2,(heroH-dh)/2,dw,dh);
+      // 皮肤滤镜（用半透明色层模拟）
+      const skin=$('hero').dataset.skin||'';
+      const tints={'skin-warm':'rgba(200,140,60,.16)','skin-cool':'rgba(60,90,140,.20)',
+        'skin-dusk':'rgba(120,60,40,.28)','skin-night':'rgba(10,20,50,.48)',
+        'skin-film':'rgba(90,80,70,.22)','skin-vivid':'rgba(255,180,80,.06)',
+        'skin-dawn':'rgba(255,220,170,.16)'};
+      if(tints[skin]){ ctx.fillStyle=tints[skin]; ctx.fillRect(0,0,W,heroH); }
+      // 渐变遮罩
+      const g=ctx.createLinearGradient(0,0,0,heroH);
+      g.addColorStop(0,'rgba(20,24,27,.38)'); g.addColorStop(.4,'rgba(20,24,27,.02)');
+      g.addColorStop(.72,'rgba(20,24,27,.12)'); g.addColorStop(1,'rgba(20,24,27,.70)');
+      ctx.fillStyle=g; ctx.fillRect(0,0,W,heroH);
+      ctx.restore();
+    }else{
+      ctx.fillStyle='#8fa3ad'; ctx.fillRect(0,0,W,heroH);
+    }
+    // 坐标 chip
+    ctx.font=`12px ${FONT}`;
+    const coordTxt=fmtCoord(c);
+    const cw=ctx.measureText(coordTxt).width+22;
+    ctx.fillStyle='rgba(20,24,27,.5)';
+    roundRect(ctx,20,20,cw,30,15); ctx.fill();
+    ctx.strokeStyle='rgba(255,255,255,.4)'; ctx.lineWidth=1; ctx.stroke();
+    ctx.fillStyle='#fff'; ctx.fillText(coordTxt,31,40);
+    // 期号
+    ctx.textAlign='right'; ctx.fillStyle='rgba(255,255,255,.85)'; ctx.font=`11px ${SERIF}`;
+    ctx.fillText('No.'+c.id.slice(0,3).toUpperCase()+'-'+new Date().toISOString().slice(0,10).replace(/-/g,''),W-22,39);
+    ctx.textAlign='left';
+    // 城市名
+    ctx.fillStyle='rgba(255,255,255,.9)'; ctx.font=`11px ${FONT}`;
+    ctx.fillText(isZh()?'城市图鉴 · CITY SIGN':'THE CITY · CITY SIGN',28,heroH-92);
+    ctx.fillStyle='#fff'; ctx.font=`bold 46px ${SERIF}`;
+    const name=isZh()?c.zh:c.en;
+    ctx.fillText(name,26,heroH-42);
+    const nameW=ctx.measureText(name).width;
+    const enName=isZh()?c.en:c.zh;
+    ctx.font=`19px ${SERIF}`;
+    ctx.fillStyle='rgba(255,255,255,.9)';
+    ctx.fillText(enName, 26+nameW+16, heroH-42);
+    ctx.font=`12px ${FONT}`; ctx.fillStyle='rgba(255,255,255,.9)';
+    const place=isZh()?`${c.continent} · ${c.region} · ${c.countryZh}`:`${c.countryEn} · ${c.regionEn} · ${c.continentEn}`;
+    ctx.fillText(place+'　|　'+(isZh()?c.nickname:c.en),28,heroH-20);
+
+    let y=heroH+26;
+    // 天气条
+    ctx.fillStyle='#fbf9f4'; ctx.strokeStyle='#e6e2da'; ctx.lineWidth=1;
+    roundRect(ctx,26,y,W-52,84,12); ctx.fill(); ctx.stroke();
+    const cellW=(W-52)/3;
+    const cells=[
+      [isZh()?'此刻天气':'WEATHER', wx?`${wx.temperature_2m.toFixed(1)}°C`:'—'],
+      [isZh()?'当地时间':'LOCAL TIME', localClock(c.tz,false)],
+      [isZh()?'今日日照':'SUN TODAY', sun?`${sun.sunrise[0].slice(11,16)} / ${sun.sunset[0].slice(11,16)}`:'—']
+    ];
+    cells.forEach((cl,i)=>{
+      const cx=26+i*cellW;
+      if(i>0){ ctx.strokeStyle='#e6e2da'; ctx.beginPath(); ctx.moveTo(cx,y+12); ctx.lineTo(cx,y+72); ctx.stroke(); }
+      ctx.textAlign='center';
+      ctx.fillStyle='#9aa1a7'; ctx.font=`10px ${FONT}`; ctx.fillText(cl[0],cx+cellW/2,y+26);
+      ctx.fillStyle='#23282d'; ctx.font=`bold 21px ${FONT}`; ctx.fillText(cl[1],cx+cellW/2,y+56);
+      ctx.textAlign='left';
+    });
+    y+=84+24;
+
+    // 世界位置地图
+    sectionTitle(ctx,isZh()?'世界位置 · WHERE ON EARTH':'WHERE ON EARTH',26,y); y+=22;
+    ctx.fillStyle='#fbf9f4'; ctx.strokeStyle='#e6e2da';
+    roundRect(ctx,26,y,W-52,132,12); ctx.fill(); ctx.stroke();
+    // 点阵地图缩绘
+    const mb={x:34,y:y+8,w:250,h:100};
+    ctx.save(); roundRect(ctx,mb.x,mb.y,mb.w,mb.h,6); ctx.clip();
+    ctx.fillStyle='#f3f1ea'; ctx.fillRect(mb.x,mb.y,mb.w,mb.h);
+    const sxx=mb.w/MAP.w, syy=mb.h/MAP.h;
+    ctx.fillStyle='#a9553d';
+    // 用点阵：解析 MAP.dots 的 M/h/v/z 生成小方块
+    drawMapDots(ctx,MAP.dots,mb.x,mb.y,sxx,syy,'#8f9c92');
+    const mx=mb.x+(c.lon+180)*sxx, my=mb.y+(MAP.top-c.lat)*syy;
+    ctx.strokeStyle='#a9553d'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(mx,mb.y); ctx.lineTo(mx,mb.y+mb.h); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(mb.x,my); ctx.lineTo(mb.x+mb.w,my); ctx.stroke();
+    ctx.beginPath(); ctx.arc(mx,my,4,0,7); ctx.stroke();
+    ctx.fillStyle='#a9553d'; ctx.beginPath(); ctx.arc(mx,my,2,0,7); ctx.fill();
+    ctx.fillStyle='#5d7568'; ctx.font=`bold 10px ${FONT}`; ctx.fillText(offsetOf(c.tz),mb.x+5,mb.y+mb.h-5);
+    ctx.restore();
+    // 地图右侧信息
+    const ix=mb.x+mb.w+18;
+    ctx.fillStyle='#9aa1a7'; ctx.font=`10px ${FONT}`;
+    ctx.fillText(isZh()?'经纬度 · COORDINATES':'COORDINATES',ix,y+30);
+    ctx.fillStyle='#23282d'; ctx.font=`14px ${FONT}`; ctx.fillText(fmtCoord(c),ix,y+52);
+    ctx.fillStyle='#9aa1a7'; ctx.font=`10px ${FONT}`;
+    ctx.fillText(isZh()?'时区 · TIME ZONE':'TIME ZONE',ix,y+78);
+    ctx.fillStyle='#5d7568'; ctx.font=`12px ${FONT}`; ctx.fillText(`${c.tz} · ${offsetOf(c.tz)}`,ix,y+98);
+    y+=132+22;
+
+    // 城市档案
+    sectionTitle(ctx,isZh()?'城市档案 · CITY FACTS':'CITY FACTS',26,y); y+=20;
+    const facts=[
+      [isZh()?'位置':'LOCATION', isZh()?`${c.countryZh} · ${c.region}`:`${c.countryEn} · ${c.regionEn}`],
+      [isZh()?'人口':'POPULATION', fmtPop(c)],
+      [isZh()?'面积':'AREA', fmtArea(c)],
+      [isZh()?'气候':'CLIMATE', isZh()?c.climate:c.climateEn],
+      [isZh()?'半球':'HEMISPHERE', hemi(c)],
+      [isZh()?'时区':'TIME ZONE', offsetOf(c.tz)],
+    ];
+    facts.forEach((f,i)=>{
+      const col=i%3, row=Math.floor(i/3);
+      const fx=26+col*((W-52)/3), fy=y+row*46;
+      ctx.fillStyle='#9aa1a7'; ctx.font=`10.5px ${FONT}`; ctx.fillText(f[0],fx,fy);
+      ctx.fillStyle='#23282d'; ctx.font=`13px ${FONT}`; ctx.fillText(f[1],fx,fy+20);
+    });
+    y+=2*46+16;
+
+    // 地标与风味
+    sectionTitle(ctx,isZh()?'地标与风味 · SIGHTS & FLAVOURS':'SIGHTS & FLAVOURS',26,y); y+=20;
+    y=drawTags(ctx,(isZh()?c.landmarks:c.landmarksEn).slice(0,3),26,y,'#fbf9f4','#23282d');
+    y=drawTags(ctx,(isZh()?c.foods.zh:c.foods.en).slice(0,3),26,y+2,'#f6f1e9','#8a6a3f');
+    y+=16;
+
+    // 句子
+    const lines=linesOf(c);
+    const ln=lines[quoteIndex]||{zh:'—',en:'—',kindZh:'',kindEn:'',byZh:'',byEn:''};
+    const qh=112;
+    ctx.fillStyle='#faf6f0';
+    roundRect(ctx,26,y,W-52,qh,10); ctx.fill();
+    ctx.fillStyle='#a9553d'; ctx.fillRect(26,y+10,3,qh-20);
+    ctx.fillStyle='#a9553d'; ctx.font=`10px ${FONT}`;
+    const kind=isZh()?ln.kindZh:ln.kindEn;
+    ctx.fillText('〔'+kind+'〕',42,y+32);
+    ctx.fillStyle='#3b342c'; ctx.font=`16px ${SERIF}`;
+    const qtext=isZh()?ln.zh:ln.en;
+    wrapText(ctx,qtext,42,y+58,W-52-32,24,2);
+    ctx.fillStyle='#6d747b'; ctx.font=`11px ${FONT}`;
+    ctx.fillText('— '+(isZh()?ln.byZh:ln.byEn),42,y+qh-16);
+    y+=qh+20;
+
+    canvas.toBlob(b=>{
+      if(b){ const u=URL.createObjectURL(b); download(u, safeName()+'.png');
+        setTimeout(()=>URL.revokeObjectURL(u),4000); toast(isZh()?'已导出 PNG':'PNG exported'); }
+      else toast(isZh()?'PNG 生成失败':'PNG failed');
+    },'image/png');
+  }catch(e){ toast(isZh()?'导出失败：'+e.message:'Export failed: '+e.message); }
+};
+function roundRect(ctx,x,y,w,h,r){
+  ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r);
+  ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath();
+}
+function sectionTitle(ctx,text,x,y){
+  ctx.fillStyle='#a9553d'; ctx.font=`bold 11px "${'PingFang SC'},sans-serif"`;
+  ctx.fillText(text,x,y);
+  const tw=ctx.measureText(text).width;
+  ctx.strokeStyle='#e6e2da'; ctx.beginPath(); ctx.moveTo(x+tw+10,y-4); ctx.lineTo(734,y-4); ctx.stroke();
+}
+function drawTags(ctx,arr,x,y,bg,fg){
+  let cx=x;
+  arr.forEach(a=>{
+    ctx.font=`12px "${'PingFang SC'},sans-serif"`;
+    const tw=ctx.measureText(a).width, bw=tw+22;
+    if(cx+bw>734){ cx=x; y+=32; }
+    ctx.fillStyle=bg; roundRect(ctx,cx,y-13,bw,26,13); ctx.fill();
+    ctx.strokeStyle='#e6e2da'; ctx.stroke();
+    ctx.fillStyle=fg; ctx.fillText(a,cx+11,y+4);
+    cx+=bw+8;
+  });
+  return y+34;
+}
+function drawMapDots(ctx,pathStr,ox,oy,sx,sy,color){
+  ctx.fillStyle=color;
+  // 解析 "M x y h2.4v2.4h-2.4z" 重复
+  const re=/M([\d.-]+) ([\d.-]+)h2\.4v2\.4h-2\.4z/g;
+  let m;
+  while((m=re.exec(pathStr))!==null){
+    const x=ox+parseFloat(m[1])*sx, y=oy+parseFloat(m[2])*sy;
+    ctx.fillRect(x,y,Math.max(1,2.4*sx),Math.max(1,2.4*sy));
+  }
+}
+
+applyStaticLang();
+render();
+setInterval(()=>fetchWeather(current), 10*60*1000);
+</script>
+</body>
+</html>
